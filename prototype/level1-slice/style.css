@@ -1,0 +1,126 @@
+/* PROTOTYPE — throwaway. Three variants via body[data-variant]. */
+* { box-sizing: border-box; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.skip { position: absolute; left: -999px; top: 0; padding: .6rem 1rem; z-index: 50; }
+.skip:focus { left: 0; }
+body { margin: 0; font-size: 17px; line-height: 1.55; padding-bottom: 5.5rem; }
+h1 { font-size: 1.7rem; line-height: 1.2; margin: .2rem 0 .6rem; }
+h2 { font-size: 1.15rem; margin: 1rem 0 .4rem; }
+button { font: inherit; font-weight: 700; cursor: pointer; border-radius: 10px; padding: .65rem 1.1rem; }
+button:focus-visible, a:focus-visible, pre:focus-visible, textarea:focus-visible {
+  outline: 3px solid currentColor; outline-offset: 2px;
+}
+code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .95em; }
+.goal code { font-size: 1.25rem; font-weight: 700; }
+.topbar { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; align-items: baseline; padding: .8rem 1.2rem; }
+.brand { font-size: 1.5rem; font-weight: 800; margin: 0; }
+.tagline, .points, .timer { margin: 0; }
+.planets { list-style: none; display: flex; gap: .6rem; padding: 0; margin: .4rem 0; }
+.planet { width: 64px; height: 64px; border-radius: 50%; padding: 0; font-size: .8rem; line-height: 1.15; }
+.planet .st { display: block; font-size: .68rem; font-weight: 400; }
+.map-msg { min-height: 1.5em; font-weight: 700; }
+.buddy { text-align: center; }
+.bolt { width: 130px; height: auto; }
+.bubble { border-radius: 14px; padding: .8rem 1rem; text-align: left; min-height: 3.2em; }
+.editor { height: 240px; border-radius: 10px; overflow: hidden; }
+.editor-fallback { width: 100%; font-family: ui-monospace, Consolas, monospace; font-size: 15px; padding: .8rem; border-radius: 10px; }
+.actions { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; margin: .8rem 0; }
+.keys { margin: 0; font-size: .92rem; }
+.output { border-radius: 10px; padding: .9rem 1rem; min-height: 4.5em; white-space: pre-wrap; font-size: 16px; }
+.verdict { font-weight: 800; font-size: 1.1rem; min-height: 1.4em; }
+.hint { border-radius: 10px; padding: .6rem 1rem; margin-top: .7rem; }
+.state { padding: .6rem 1.2rem; font-size: .9rem; }
+.switcher {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 1rem; z-index: 40;
+  display: flex; gap: .8rem; align-items: center; padding: .45rem .9rem; border-radius: 999px;
+  background: #111; color: #fff; border: 2px solid #fff; box-shadow: 0 4px 18px rgba(0,0,0,.45);
+}
+.switcher button { background: #333; color: #fff; border: 1px solid #888; padding: .3rem .7rem; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---------- Variant A: Mission control (map rail left, dark navy) ---------- */
+body[data-variant="A"] { background: #0b1e2d; color: #f2f7fa; font-family: Verdana, Geneva, sans-serif;
+  display: grid; grid-template-columns: 190px 1fr; grid-template-areas: "top top" "map lesson" "state state"; }
+body[data-variant="A"] .topbar { grid-area: top; background: #071521; border-bottom: 3px solid #ffc53d; }
+body[data-variant="A"] .brand, body[data-variant="A"] h1, body[data-variant="A"] h2 { font-family: "Trebuchet MS", Verdana, sans-serif; }
+body[data-variant="A"] .map { grid-area: map; padding: 1rem; background: #0e2a40; }
+body[data-variant="A"] .planets { flex-direction: column; align-items: center; }
+body[data-variant="A"] .lesson { grid-area: lesson; display: grid; gap: 1rem; padding: 1rem 1.2rem;
+  grid-template-columns: minmax(230px, 320px) 1fr; grid-template-areas: "story work" "buddy work"; align-content: start; }
+body[data-variant="A"] .story { grid-area: story; } body[data-variant="A"] .buddy { grid-area: buddy; }
+body[data-variant="A"] .work { grid-area: work; }
+body[data-variant="A"] .state { grid-area: state; background: #071521; }
+body[data-variant="A"] .story, body[data-variant="A"] .work, body[data-variant="A"] .buddy {
+  background: #123047; border: 1px solid #2a587c; border-radius: 14px; padding: 1rem 1.2rem; }
+body[data-variant="A"] .bubble, body[data-variant="A"] .hint { background: #0e2a40; border: 1px solid #2a587c; }
+body[data-variant="A"] .output { background: #04101c; color: #b8f1cc; border: 1px solid #2a587c; }
+body[data-variant="A"] .editor, body[data-variant="A"] .editor-fallback { border: 2px solid #2a587c; background: #0a1a29; color: #f2f7fa; }
+body[data-variant="A"] button { background: #17456b; color: #fff; border: 2px solid #7fb3d9; }
+body[data-variant="A"] #run-btn { background: #ffc53d; color: #1a1405; border-color: #ffe1a1; font-size: 1.1rem; }
+body[data-variant="A"] .planet { background: #17456b; color: #fff; border: 3px solid #7fb3d9; border-radius: 50%; width: 80px; height: 80px; font-size: .72rem; overflow-wrap: break-word; }
+body[data-variant="A"] .planet[data-state="open"] { border-color: #ffc53d; box-shadow: 0 0 0 3px #ffc53d55; }
+body[data-variant="A"] .planet[data-state="passed"] { background: #146c43; border-color: #7be3a8; }
+body[data-variant="A"] .planet[data-state="locked"] { background: #33475c; color: #c9d8e4; border-color: #5b7c99; }
+body[data-variant="A"] .goal code { color: #ffc53d; }
+body[data-variant="A"] .b-body { fill: #dbe9f4; } body[data-variant="A"] .b-accent { fill: #ffc53d; }
+body[data-variant="A"] .b-eye { fill: #0b1e2d; } body[data-variant="A"] .b-dark { fill: #17456b; }
+
+/* ---------- Variant B: Quest log (map path on top, light, story first) ---------- */
+body[data-variant="B"] { background: #ffffff; color: #14213d; font-family: "Segoe UI", Verdana, sans-serif; }
+body[data-variant="B"] .topbar { border-bottom: 4px solid #14213d; }
+body[data-variant="B"] .brand, body[data-variant="B"] h1 { font-family: Georgia, "Times New Roman", serif; }
+body[data-variant="B"] .brand { font-size: 1.9rem; }
+body[data-variant="B"] .map { padding: .6rem 1.2rem 0; }
+body[data-variant="B"] .planets { flex-direction: row; flex-wrap: wrap; }
+body[data-variant="B"] .planet { border-radius: 14px; width: 96px; height: 60px; font-size: .74rem; background: #eef6fb; color: #14213d; border: 2px solid #14213d; }
+body[data-variant="B"] .planet[data-state="open"] { background: #ffd166; }
+body[data-variant="B"] .planet[data-state="passed"] { background: #1b7a43; color: #fff; }
+body[data-variant="B"] .planet[data-state="locked"] { background: #e3e8ee; color: #3d4c63; border-style: dashed; }
+body[data-variant="B"] .lesson { max-width: 860px; margin: 0 auto; padding: 0 1.2rem 1rem; }
+body[data-variant="B"] .story { border-bottom: 3px solid #14213d; padding-bottom: .8rem; }
+body[data-variant="B"] .buddy { display: flex; gap: 1rem; align-items: center; text-align: left; margin: 1rem 0; }
+body[data-variant="B"] .bolt { width: 86px; flex: none; }
+body[data-variant="B"] .bubble { background: #fff4d6; border: 2px solid #14213d; flex: 1; }
+body[data-variant="B"] .hint { background: #eef6fb; border: 1px solid #14213d; }
+body[data-variant="B"] .editor, body[data-variant="B"] .editor-fallback { border: 2px solid #14213d; background: #fdfdfd; color: #14213d; }
+body[data-variant="B"] .output { background: #14213d; color: #d9f99d; }
+body[data-variant="B"] button { background: #fff; color: #14213d; border: 2px solid #14213d; }
+body[data-variant="B"] #run-btn { background: #c2410c; color: #fff; border-color: #7c2d12; font-size: 1.1rem; }
+body[data-variant="B"] .goal code { background: #ffd166; padding: .1rem .5rem; border-radius: 6px; }
+body[data-variant="B"] .b-body { fill: #ffd166; } body[data-variant="B"] .b-accent { fill: #c2410c; }
+body[data-variant="B"] .b-eye { fill: #14213d; } body[data-variant="B"] .b-dark { fill: #14213d; }
+
+/* ---------- Variant C: Cockpit console (editor first, map strip bottom) ---------- */
+body[data-variant="C"] { background: #101613; color: #e8f5e9; font-family: "Segoe UI", Verdana, sans-serif;
+  display: flex; flex-direction: column; }
+body[data-variant="C"] .topbar { background: #0a0e0b; border-bottom: 2px solid #a3e635; order: 0; }
+body[data-variant="C"] .brand, body[data-variant="C"] h1, body[data-variant="C"] h2 {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace; letter-spacing: .02em; }
+body[data-variant="C"] .lesson { order: 1; display: grid; gap: 1rem; padding: 1rem 1.2rem;
+  grid-template-columns: 1fr minmax(230px, 300px); grid-template-areas: "work story" "work buddy"; align-content: start; }
+body[data-variant="C"] .work { grid-area: work; } body[data-variant="C"] .story { grid-area: story; }
+body[data-variant="C"] .buddy { grid-area: buddy; }
+body[data-variant="C"] .map { order: 2; padding: .4rem 1.2rem; background: #0a0e0b; border-top: 2px solid #3f6212; }
+body[data-variant="C"] .state { order: 3; background: #0a0e0b; }
+body[data-variant="C"] .planets { flex-direction: row; flex-wrap: wrap; }
+body[data-variant="C"] .planet { border-radius: 8px; width: 76px; height: 52px; background: #1b241e; color: #e8f5e9; border: 2px solid #65a30d; }
+body[data-variant="C"] .planet[data-state="open"] { background: #a3e635; color: #131a05; }
+body[data-variant="C"] .planet[data-state="passed"] { background: #166534; color: #fff; border-color: #86efac; }
+body[data-variant="C"] .planet[data-state="locked"] { background: #232323; color: #bdbdbd; border-color: #555; }
+body[data-variant="C"] .story, body[data-variant="C"] .work, body[data-variant="C"] .buddy {
+  background: #1b241e; border: 1px solid #65a30d; border-radius: 8px; padding: 1rem 1.2rem; }
+body[data-variant="C"] .bubble, body[data-variant="C"] .hint { background: #101613; border: 1px solid #65a30d; border-radius: 8px; }
+body[data-variant="C"] .editor { height: 300px; }
+body[data-variant="C"] .editor, body[data-variant="C"] .editor-fallback { border: 2px solid #65a30d; background: #0a0e0b; color: #e8f5e9; border-radius: 8px; }
+body[data-variant="C"] .output { background: #050705; color: #bef264; border: 1px solid #65a30d; border-radius: 8px; }
+body[data-variant="C"] button { background: #1b241e; color: #e8f5e9; border: 2px solid #a3e635; border-radius: 8px; }
+body[data-variant="C"] #run-btn { background: #a3e635; color: #131a05; font-size: 1.1rem; }
+body[data-variant="C"] .goal code { color: #a3e635; }
+body[data-variant="C"] .b-body { fill: #65a30d; } body[data-variant="C"] .b-accent { fill: #fde047; }
+body[data-variant="C"] .b-eye { fill: #0a0e0b; } body[data-variant="C"] .b-dark { fill: #365314; }
+
+@media (max-width: 820px) {
+  body[data-variant="A"], body[data-variant="A"] .lesson, body[data-variant="C"] .lesson { display: block; }
+  body[data-variant="A"] .planets { flex-direction: row; flex-wrap: wrap; }
+  .story, .work, .buddy { margin-bottom: 1rem; }
+}

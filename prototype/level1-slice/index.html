@@ -1,0 +1,95 @@
+<!doctype html>
+<!-- PROTOTYPE — throwaway. Ticket: Space-robot visual direction and level 1 slice.
+     Three visual variants of the JavaQuest world map + level 1 (print) screen,
+     switchable via ?variant=A|B|C. Simulated Java run only; no persistence. -->
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JavaQuest prototype — Level 1: First Print</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-variant="A">
+<a class="skip" href="#lesson">Skip to lesson</a>
+
+<header class="topbar">
+  <p class="brand">JavaQuest</p>
+  <p class="tagline">Code missions with Bolt the robot</p>
+  <p class="points" aria-live="polite">Points: <strong id="points">0</strong></p>
+  <p class="timer" title="Time since this page opened. Helpers: watch if the first pass lands inside 15 minutes.">
+    Mission clock: <strong id="clock">0:00</strong>
+  </p>
+</header>
+
+<nav class="map" aria-label="World map: 10 planets">
+  <h2 class="map-title">Planet map</h2>
+  <ol id="planets" class="planets"></ol>
+  <p id="map-msg" class="map-msg" aria-live="polite"></p>
+</nav>
+
+<main id="lesson" class="lesson">
+  <section class="story" aria-labelledby="story-h">
+    <h1 id="story-h">Level 1: Wake Up, Bolt!</h1>
+    <p>Bolt the robot just landed on Planet Print.</p>
+    <p>Bolt can speak only when you give a print command.</p>
+    <h2>Your mission</h2>
+    <p>Make Bolt say exactly this line:</p>
+    <p class="goal"><code>Hello, Galaxy!</code></p>
+    <p>New power in this level: <strong>print</strong>.</p>
+    <button id="hint-btn" type="button" aria-expanded="false" aria-controls="hint">Show a hint</button>
+    <div id="hint" class="hint" hidden>
+      <p>A print command looks like this:</p>
+      <p><code>System.out.println("Hi, Bolt!");</code></p>
+      <p>Change the words inside the quotes. Keep the semicolon at the end.</p>
+    </div>
+  </section>
+
+  <section class="buddy" aria-labelledby="buddy-h">
+    <h2 id="buddy-h" class="visually-hidden">Bolt says</h2>
+    <svg class="bolt" viewBox="0 0 120 130" role="img" aria-label="Bolt, a friendly square robot with an antenna">
+      <rect x="56" y="6" width="8" height="18" rx="4" class="b-dark"/>
+      <circle cx="60" cy="8" r="7" class="b-accent"/>
+      <rect x="22" y="24" width="76" height="62" rx="14" class="b-body"/>
+      <circle cx="45" cy="52" r="8" class="b-eye"/><circle cx="75" cy="52" r="8" class="b-eye"/>
+      <rect x="44" y="68" width="32" height="7" rx="3.5" class="b-dark"/>
+      <rect x="6" y="44" width="14" height="30" rx="7" class="b-body"/>
+      <rect x="100" y="44" width="14" height="30" rx="7" class="b-body"/>
+      <rect x="36" y="88" width="48" height="26" rx="8" class="b-body"/>
+      <rect x="52" y="95" width="16" height="12" rx="3" class="b-accent"/>
+      <rect x="38" y="116" width="16" height="10" rx="4" class="b-dark"/>
+      <rect x="66" y="116" width="16" height="10" rx="4" class="b-dark"/>
+    </svg>
+    <p id="buddy-says" class="bubble" aria-live="polite">Hi! I am Bolt. Type a print command, then press Run.</p>
+  </section>
+
+  <section class="work" aria-labelledby="code-h">
+    <h2 id="code-h">Your code</h2>
+    <div id="editor" class="editor" role="group" aria-label="Java code editor"></div>
+    <textarea id="editor-fallback" class="editor-fallback" rows="9" spellcheck="false"
+      aria-label="Java code editor (simple mode)" hidden></textarea>
+    <div class="actions">
+      <button id="run-btn" type="button">Run code</button>
+      <button id="reset-btn" type="button">Restart code</button>
+      <p class="keys">Tip: press <kbd>Ctrl</kbd> + <kbd>Enter</kbd> to run.</p>
+    </div>
+    <h2 id="out-h">Output</h2>
+    <pre id="output" class="output" tabindex="0" aria-live="polite" aria-labelledby="out-h">Nothing yet. Press Run code.</pre>
+    <p id="verdict" class="verdict" aria-live="assertive"></p>
+  </section>
+</main>
+
+<footer class="state" aria-label="Prototype state">
+  <p>Prototype state — runs: <span id="st-runs">0</span> · passed: <span id="st-passed">no</span> ·
+     first pass at: <span id="st-passtime">—</span> · editor: <span id="st-editor">loading</span></p>
+</footer>
+
+<div class="switcher" role="group" aria-label="Prototype variant switcher">
+  <button id="var-prev" type="button" aria-label="Previous design">◀</button>
+  <span id="var-label">A (Mission control)</span>
+  <button id="var-next" type="button" aria-label="Next design">▶</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
