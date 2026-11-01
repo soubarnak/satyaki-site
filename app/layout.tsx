@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { MissionShell } from "@/components/mission-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,19 +7,13 @@ export const metadata: Metadata = {
   description: "Learn Java on a space-robot quest with Bolt.",
 };
 
+// Every learner view renders inside the Mission control shell
+// (ADR-0008): persistent planet rail plus top navigation.
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en">
       <body>
-        <header>
-          <nav aria-label="Main">
-            <Link href="/">Level map</Link>{" "}
-            <Link href="/playground">Playground</Link>{" "}
-            <Link href="/arena">Robot arena</Link>{" "}
-            <Link href="/progress">Progress</Link>
-          </nav>
-        </header>
-        <main>{children}</main>
+        <MissionShell>{children}</MissionShell>
       </body>
     </html>
   );
