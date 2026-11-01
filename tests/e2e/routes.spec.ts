@@ -16,9 +16,9 @@ for (const [path, heading] of routes) {
   });
 }
 
-test("POST /api/run answers 501 until the run route ticket lands", async ({
+test("POST /api/run rejects a request with no program text (DR-001)", async ({
   request,
 }) => {
   const response = await request.post("/api/run", { data: {} });
-  expect(response.status()).toBe(501);
+  expect(response.status()).toBe(400);
 });

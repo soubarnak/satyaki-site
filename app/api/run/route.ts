@@ -1,9 +1,11 @@
+import { createRunHandler } from "@/lib/server/run-handler";
+
+// Node.js runtime: the in-memory rate limiter needs one persistent
+// process (ADR-0005, ADR-0007).
 export const runtime = "nodejs";
 
-// Placeholder only. The run route ticket builds the real handler (ADR-0002 to ADR-0005).
-export async function POST() {
-  return Response.json(
-    { result: "runner-unavailable", detail: "Run route not built yet." },
-    { status: 501 },
-  );
+const handleRun = createRunHandler();
+
+export async function POST(request: Request): Promise<Response> {
+  return handleRun(request);
 }
