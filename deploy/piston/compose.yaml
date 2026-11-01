@@ -1,0 +1,51 @@
+# JavaQuest self-hosted Java runner: Piston behind an authenticated gateway.
+# Deploy target: Coolify (Docker Compose service) at satyakisjava.bongbetic.com.
+# Coolify itself runs Docker; locally this file can be validated with podman compose.
+#
+# Public surface: gateway only. Every request must carry header
+#   X-Runner-Key: <RUNNER_KEY>
+# Piston is never published directly. Coolify generates the key as
+# SERVICE_PASSWORD_64_RUNNERKEY (never committed); mirror it on the site app as RUNNER_KEY.
+services:
+  piston:
+    image: ghcr.io/engineer-man/piston:latest
+    privileged: true # required: Piston creates namespaces/cgroups per job (host must be cgroup v2)
+    restart: unless-stopped
+    volumes:
+      - piston_data:/piston
+    environment:
+      # Hard caps from SRS NFR-004 / NFR-002 (CR-004: run route aborts by 10 s)
+      PISTON_COMPILE_TIMEOUT: "5000"
+      PISTON_COMPILE_CPU_TIME: "5000"
+      PISTON_RUN_TIMEOUT: "3000"
+      PISTON_RUN_CPU_TIME: "3000"
+      PISTON_RUN_MEMORY_LIMIT: "268435456" # 256 MB
+      PISTON_COMPILE_MEMORY_LIMIT: "536870912" # 512 MB (javac)
+      PISTON_DISABLE_NETWORKING: "true" # learner programs get no network
+      PISTON_OUTPUT_MAX_SIZE: "10240"
+      PISTON_MAX_CONCURRENT_JOBS: "4"
+    expose:
+      - "2000"
+
+  gateway:
+    image: docker.io/library/caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - piston
+    environment:
+      # Coolify magic var: generated once, persisted, visible in Coolify env UI.
+      # Copy SERVICE_PASSWORD_64_RUNNERKEY to the site app as RUNNER_KEY.
+      RUNNER_KEY: ${SERVICE_PASSWORD_64_RUNNERKEY}
+      # Coolify magic env: route this domain to gateway port 80 + TLS.
+      SERVICE_FQDN_GATEWAY_80: satyakisjava.bongbetic.com
+    command:
+      - sh
+      - -c
+      - |
+        printf ':80 {\n @ok header X-Runner-Key %s\n handle @ok {\n  reverse_proxy piston:2000\n }\n handle {\n  respond "forbidden" 403\n }\n}\n' "$$RUNNER_KEY" > /etc/caddy/Caddyfile
+        exec caddy run --config /etc/caddy/Caddyfile
+    expose:
+      - "80"
+
+volumes:
+  piston_data:
