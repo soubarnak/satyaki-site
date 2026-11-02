@@ -540,6 +540,57 @@ button.level-card-locked:hover {
   border-color: var(--amber) !important;
 }
 
+/* Parent progress view (WF-005, FR-012, FR-013). Warning and reset
+   reuse the Mission control tokens; no new palette. */
+.progress-warning {
+  background: var(--panel);
+  border: 2px solid var(--amber);
+  border-radius: 0.9rem;
+  padding: 0.8rem 1.1rem;
+  margin-bottom: 1.3rem;
+}
+
+.progress-confirm {
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 0.9rem;
+  padding: 0.8rem 1.1rem;
+  max-width: 34rem;
+}
+
+.progress-confirm-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 0.7rem;
+}
+
+.progress-reset,
+.progress-keep {
+  font: inherit;
+  font-weight: bold;
+  border-radius: 0.7rem;
+  border: 2px solid transparent;
+  padding: 0.5rem 1.3rem;
+  cursor: pointer;
+}
+
+.progress-reset {
+  background: var(--amber);
+  color: var(--amber-text);
+}
+
+.progress-reset:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.progress-keep {
+  background: var(--bg);
+  border-color: var(--panel-edge);
+  color: var(--text);
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

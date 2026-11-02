@@ -14,10 +14,12 @@ export interface ProgressState {
   progress: Progress;
   /** False until the stored record has been read on this device. */
   loaded: boolean;
+  /** Re-read the stored record (for example after this tab cleared it). */
+  refresh(): void;
 }
 
 export function useProgress(): ProgressState {
-  const [state, setState] = useState<ProgressState>({
+  const [state, setState] = useState<{ progress: Progress; loaded: boolean }>({
     progress: EMPTY_PROGRESS,
     loaded: false,
   });
@@ -34,5 +36,9 @@ export function useProgress(): ProgressState {
     };
   }, []);
 
-  return state;
+  function refresh(): void {
+    setState({ progress: browserProgressStorage().load(), loaded: true });
+  }
+
+  return { ...state, refresh };
 }
