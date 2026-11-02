@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<!-- PROTOTYPE, wipe me. Throwaway for soubarnak/satyaki-site#7 (OQ-001). Not production. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arena tuning demo — is the station fight winnable and fun? (OQ-001)</title>
+<style>
+  :root { --navy: #14243d; --amber: #f5a623; --paper: #ffffff; --ink: #1c2b45; }
+  body { font-family: Georgia, "Times New Roman", serif; background: var(--navy);
+    color: var(--paper); margin: 0; padding: 24px; line-height: 1.45; }
+  main { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .q { border-left: 4px solid var(--amber); padding: 8px 12px; margin: 12px 0 20px;
+    background: #1d3252; }
+  .panel { background: var(--paper); color: var(--ink); border-radius: 8px;
+    padding: 12px 16px; margin: 12px 0; }
+  .panel dt { font-weight: bold; } .panel dd { margin: 0 0 4px 12px; }
+  .lane { font-family: monospace; letter-spacing: 2px; font-size: 1.1rem; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+  button { font-size: 1rem; padding: 8px 14px; border-radius: 8px; cursor: pointer;
+    border: 2px solid var(--amber); background: var(--navy); color: #fff; }
+  button.ghost { background: transparent; }
+  button:disabled { opacity: 0.4; cursor: default; }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .tabbody { background: #1d3252; border-radius: 8px; padding: 12px 16px; margin-top: 8px; }
+  label { display: inline-block; margin-right: 12px; }
+  input { width: 64px; font-size: 1rem; }
+  .verdict { font-weight: bold; font-size: 1.1rem; }
+  .inwindow { color: #7ddf8e; } .outwindow { color: #ff9d8a; }
+  code { background: #0e1a30; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Arena tuning demo — OQ-001</h1>
+  <p>For the parent and the learner, with Bolt.</p>
+  <div class="q"><strong>Question:</strong> do the AS-002 values (station health 40,
+  damage 2 per next-to-it facing <code>ATTACK</code>, 5 cells away, station never moves)
+  make the arena winnable in 20 to 60 commands for a Level 9 graduate, and fun?
+  Press buttons. Watch Bolt. Then tell us which preset feels right.</div>
+
+  <section class="panel" aria-live="polite">
+    <dl>
+      <dt>Bolt</dt><dd class="lane" id="lane">B . . . . S</dd>
+      <dd id="facing">Bolt faces the station.</dd>
+      <dt>Station health</dt><dd id="health">40</dd>
+      <dt>Commands used</dt><dd id="count">0 (window 20–60)</dd>
+      <dt>Verdict</dt><dd class="verdict" id="verdict">Fight on, Cadet.</dd>
+    </dl>
+  </section>
+
+  <h2>Free play</h2>
+  <div class="row">
+    <button id="bMove">MOVE</button>
+    <button id="bTurn">TURN</button>
+    <button id="bAttack">ATTACK</button>
+    <button id="bJunk" class="ghost">Print HELLO (ignored)</button>
+    <button id="bReset" class="ghost">Reset</button>
+  </div>
+
+  <h2>Tuning (the OQ-001 question)</h2>
+  <div class="row">
+    <label>Health <input id="inHealth" type="number" value="40" min="1" max="200"></label>
+    <label>Damage <input id="inDamage" type="number" value="2" min="1" max="20"></label>
+    <label>Distance <input id="inDist" type="number" value="5" min="1" max="20"></label>
+    <button id="bApply" class="ghost">Apply</button>
+  </div>
+  <div class="row">
+    <button class="ghost" data-preset="40,2,5">AS-002 (40/2/5)</button>
+    <button class="ghost" data-preset="20,2,5">Light (20/2/5)</button>
+    <button class="ghost" data-preset="60,2,5">Heavy (60/2/5)</button>
+  </div>
+
+  <h2>Guided walkthroughs</h2>
+  <div class="tabs" role="tablist">
+    <button data-tab="win">Reference win</button>
+    <button data-tab="over">Overshoot + TURN</button>
+    <button data-tab="grind">Heavy feel</button>
+    <button data-tab="trivial">Light feel</button>
+  </div>
+  <div class="tabbody" id="tabbody"></div>
+  <div class="row"><button id="bStep">Do next step</button></div>
+</main>
+<script>
+// Pure arena module. Mirrors lib/arena.ts so the feel transfers:
+// Bolt starts at 0 facing east (+1); station sits still at distance;
+// MOVE steps, TURN reverses, ATTACK hurts only next to it while facing it.
+function makeArena(health, damage, distance) {
+  return {
+    health, damage, distance, boltPos: 0, boltDir: 1,
+    opponent: health, count: 0, ignored: 0,
+    step(cmd) {
+      if (cmd !== "MOVE" && cmd !== "TURN" && cmd !== "ATTACK") { this.ignored++; return "ignored"; }
+      this.count++;
+      if (cmd === "MOVE") this.boltPos += this.boltDir;
+      else if (cmd === "TURN") this.boltDir = this.boltDir === 1 ? -1 : 1;
+      else if (Math.abs(this.boltPos - this.distance) === 1
+        && Math.sign(this.distance - this.boltPos) === this.boltDir) {
+        this.opponent = Math.max(0, this.opponent - this.damage);
+      }
+      return this.won() ? "won" : (this.count >= 100 ? "lost" : "fight");
+    },
+    won() { return this.opponent <= 0 && this.count <= 100; },
+  };
+}
+let A = makeArena(40, 2, 5);
+const $ = (id) => document.getElementById(id);
+const SCEN = {
+  win: { text: "Reference win: walk 4 cells, then 20 hits. This is what a Level 9 loop prints. Watch the count land inside 20–60.",
+    steps: ["MOVE","MOVE","MOVE","MOVE","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK","ATTACK"] },
+  over: { text: "Walk one cell too far (5 MOVEs), then TURN and step back before hitting. Shows what TURN is for.",
+    steps: ["MOVE","MOVE","MOVE","MOVE","MOVE","TURN","MOVE","TURN","ATTACK"] },
+  grind: { text: "Heavy preset (60 health): 4 walks + 30 hits. Feels long for ages 9–12? Compare with AS-002.",
+    preset: [60,2,5], steps: ["MOVE","MOVE","MOVE","MOVE"].concat(Array(30).fill("ATTACK")) },
+  trivial: { text: "Light preset (20 health): 4 walks + 10 hits. Quick — too easy for a final quest?",
+    preset: [20,2,5], steps: ["MOVE","MOVE","MOVE","MOVE"].concat(Array(10).fill("ATTACK")) },
+};
+let seq = [], at = 0;
+function render() {
+  let cells = [];
+  const lo = Math.min(0, A.boltPos, A.distance), hi = Math.max(0, A.boltPos, A.distance);
+  for (let c = lo; c <= hi; c++) cells.push(c === A.boltPos ? "B" : (c === A.distance ? "S" : "."));
+  $("lane").textContent = cells.join(" ");
+  $("facing").textContent = A.boltDir === 1 ? "Bolt faces the station side." : "Bolt faces away from the station.";
+  $("health").textContent = A.opponent + " (started " + A.health + ")";
+  const ok = A.count >= 20 && A.count <= 60;
+  $("count").innerHTML = A.count + (A.count === 0 ? " (window 20–60)" :
+    ' <span class="' + (ok || !A.won() && A.count < 20 ? "inwindow" : "outwindow") + '">' +
+    (ok ? "inside 20–60" : "outside 20–60") + "</span>") + (A.ignored ? " · " + A.ignored + " junk lines ignored" : "");
+  $("verdict").textContent = A.won() ? "Victory, Cadet. The station is awake!"
+    : (A.count >= 100 ? "Not yet, Cadet. 100 commands spent." : "Fight on, Cadet.");
+}
+function reset(h, d, s) { A = makeArena(h, d, s); render(); }
+function press(cmd) { A.step(cmd); render(); }
+$("bMove").onclick = () => press("MOVE");
+$("bTurn").onclick = () => press("TURN");
+$("bAttack").onclick = () => press("ATTACK");
+$("bJunk").onclick = () => press("HELLO");
+$("bReset").onclick = () => { seq = []; at = 0; reset(+$("inHealth").value, +$("inDamage").value, +$("inDist").value); };
+$("bApply").onclick = () => { seq = []; at = 0; reset(+$("inHealth").value, +$("inDamage").value, +$("inDist").value); };
+document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => {
+  const [h, d, s] = b.dataset.preset.split(",").map(Number);
+  $("inHealth").value = h; $("inDamage").value = d; $("inDist").value = s;
+  seq = []; at = 0; reset(h, d, s);
+});
+let tab = "win";
+function showTab() {
+  const sc = SCEN[tab];
+  at = 0; seq = sc.steps.slice();
+  if (sc.preset) { $("inHealth").value = sc.preset[0]; $("inDamage").value = sc.preset[1]; $("inDist").value = sc.preset[2]; reset(...sc.preset); }
+  else reset(+$("inHealth").value, +$("inDamage").value, +$("inDist").value);
+  $("tabbody").innerHTML = "<p>" + sc.text + "</p><p>Steps: " + seq.length + ". Press “Do next step”.</p>";
+}
+document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { tab = b.dataset.tab; showTab(); });
+$("bStep").onclick = () => {
+  if (at >= seq.length) { showTab(); return; }
+  press(seq[at]); at++;
+  $("tabbody").querySelector("p:last-child").textContent =
+    "Did step " + at + " of " + seq.length + ": " + seq[at - 1] + ".";
+};
+showTab(); render();
+</script>
+</body>
+</html>
