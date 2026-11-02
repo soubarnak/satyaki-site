@@ -1,8 +1,7 @@
+import { Playground } from "@/components/playground";
+
+// Playground (WF-003) inside the Mission control shell. Client-side
+// only: runs post to /api/run and never touch progress storage.
 export default function PlaygroundPage() {
-  return (
-    <>
-      <h1>Playground</h1>
-      <p>Playground placeholder. Built by the playground view ticket.</p>
-    </>
-  );
+  return <Playground />;
 }
