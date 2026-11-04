@@ -1,0 +1,3 @@
+# Kept so the production image build can COPY ./public: git does not
+# preserve empty directories, and without this file the Containerfile
+# runner stage fails on a fresh clone (Coolify builds from git).
