@@ -1,0 +1,23 @@
+# Keep the production image lean: only sources the build needs.
+# (Docker reads this file; podman reads it too.)
+node_modules
+.next
+out
+build
+coverage
+test-results
+.git
+.gitignore
+.next
+*.tsbuildinfo
+.env*
+.vercel
+.DS_Store
+npm-debug.log*
+deploy
+docs
+tests
+playwright.config.ts
+vitest.config.ts
+eslint.config.mjs
+next-env.d.ts
