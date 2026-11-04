@@ -17,7 +17,7 @@ services:
       # Hard caps from SRS NFR-004 / NFR-002 (CR-004: run route aborts by 10 s)
       PISTON_COMPILE_TIMEOUT: "5000"
       PISTON_COMPILE_CPU_TIME: "5000"
-      PISTON_RUN_TIMEOUT: "3000"
+      PISTON_RUN_TIMEOUT: "5000" # ADR-0003/NFR-004: must admit the run route's 5000 ms budget (#25)
       PISTON_RUN_CPU_TIME: "3000"
       PISTON_RUN_MEMORY_LIMIT: "268435456" # 256 MB
       PISTON_COMPILE_MEMORY_LIMIT: "536870912" # 512 MB (javac)
