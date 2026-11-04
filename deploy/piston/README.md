@@ -29,12 +29,14 @@ gateway over the internal server-network address below.
   redeployed. At that point the old address answered Traefik `503`
   (no route) — never a runner answer.
 - Learner domain moved to the site (#27, live 2026-11-04): the app
-  `javaquest-site` now serves both `https://satyakisjava.bongbetic.com`
-  and `https://javaquest.51.83.192.166.sslip.io` (Coolify app domains
+  `javaquest-site` first served both `https://satyakisjava.bongbetic.com`
+  and temp `https://javaquest.51.83.192.166.sslip.io` (Coolify app domains
   updated via API, then redeployed; no secret touched, no image change
-  beyond the redeploy). The runner stays internal-only: the gateway
-  sub-application still has no public FQDN, and the runner path on the
-  learner domain answers the site's `404`, never a runner response.
+  beyond the redeploy). Temp address removed after proof (#28 follow-up,
+  live 2026-11-04): the app now serves only the learner domain. The
+  runner stays internal-only: the gateway sub-application still has no
+  public FQDN, and the runner path on the learner domain answers the
+  site's `404`, never a runner response.
 - Key rotated at cutover: the provisioning key (which transited the
   provisioning session) was replaced with a fresh `openssl rand
   -base64 48` value on the service (`SERVICE_PASSWORD_64_RUNNERKEY`
@@ -45,7 +47,7 @@ gateway over the internal server-network address below.
   (locked by `lib/server/piston.test.ts` and
   `tests/unit/run-route.test.ts`).
 - Cutover verification (all live, temp site address
-  `https://javaquest.51.83.192.166.sslip.io`):
+  `https://javaquest.51.83.192.166.sslip.io`, since removed):
   - new key → `200`, java `15.0.2` listed; wrong key → `403`; no key
     → `403` (checked just after rotation, while the route was still
     public);
@@ -89,7 +91,7 @@ Caddyfile header-matcher line at gateway startup.
 ## Smoke tests (site-mediated, over the internal network)
 
 ```sh
-SITE=https://javaquest.51.83.192.166.sslip.io
+SITE=https://satyakisjava.bongbetic.com
 # 1. Starter-derived Level-1 program → ok + "Bolt is awake!" (Pass by judge rule)
 curl -s -X POST $SITE/api/run -H 'Content-Type: application/json' \
   -d '{"program":"public class Main { public static void main(String[] a){ System.out.println(\"Bolt is awake!\"); } }"}'
@@ -101,7 +103,7 @@ Public refusal (from anywhere off the server):
 
 ```sh
 curl -s -o /dev/null -w '%{http_code}\n' https://satyakisjava.bongbetic.com/api/v2/runtimes
-# expect 503 (no route) — never a runner response
+# expect 404 (site page) — never a runner response
 ```
 
 Provisioning history (2026-10-31, superseded by #26): the runner was
