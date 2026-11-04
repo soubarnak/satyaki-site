@@ -179,6 +179,13 @@ describe("NFR-014 fault set: 0 ok results", () => {
     expect(body.resultClass).toBe("runner-unavailable");
   });
 
+  it("refused key (403, e.g. a rotated-out key) → runner-unavailable (#26)", async () => {
+    const stub = await startStub(() => ({ status: 403, body: "forbidden" }));
+    const res = await handlerFor(stub.env)(runRequest({ program: "x" }));
+    expect(res.status).toBe(200);
+    expect((await bodyOf(res)).resultClass).toBe("runner-unavailable");
+  });
+
   it("garbage body → runner-unavailable", async () => {
     const stub = await startStub(() => ({ body: "this is not json" }));
     const body = await bodyOf(

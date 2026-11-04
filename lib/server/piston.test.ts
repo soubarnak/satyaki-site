@@ -77,6 +77,13 @@ describe("executeProgram faults → RunnerUnavailableError (ADR-0004)", () => {
     ).rejects.toBeInstanceOf(RunnerUnavailableError);
   });
 
+  it("refused key (403) from the runner, e.g. a rotated-out key (#26)", async () => {
+    const fetchFn = async () => new Response("forbidden", { status: 403 });
+    await expect(
+      executeProgram(ENV, "x", { fetchFn }),
+    ).rejects.toBeInstanceOf(RunnerUnavailableError);
+  });
+
   it("network failure", async () => {
     const fetchFn = async () => {
       throw new TypeError("fetch failed");
