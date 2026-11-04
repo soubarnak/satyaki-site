@@ -1,28 +1,22 @@
 # JavaQuest self-hosted Java runner: Piston behind an authenticated gateway.
-# Deploy target: hetzner1 (/srv/javaquest-runner/compose.yml), podman only.
-# Follows /media/Toto/Documents/bongbetic/bongbetic-infra/hetzner1.md:
-# Caddy owns host ports 80/443; backends join the shared `edge` network
-# and publish NO host ports (ticket #26).
+# Deploy target: Coolify service `javaquest-piston` (project JavaQuest).
+# Coolify itself runs Docker; locally this file can be validated with
+# podman: `podman compose -f deploy/piston/compose.yaml config`.
 #
-# Public surface: none. The gateway has no Caddy block and no published
-# port, so the public internet cannot call Java execution directly. The
-# site app (also on `edge`) reaches the gateway over the internal
-# server-network address:
-#   RUNNER_URL=http://javaquest-runner-gateway:80
+# Public surface: none since #26. The gateway sub-application has no
+# FQDN in Coolify (no Traefik route), so the public internet cannot
+# call Java execution directly. The service is attached to the shared
+# `coolify` Docker network (service setting connect_to_docker_network),
+# and the site app — on the same network — reaches the gateway over
+# the internal server-network address recorded in deploy/piston/README.md.
 # Every request must still carry header
 #   X-Runner-Key: <RUNNER_KEY>
-# Piston is never published directly.
-#
-# Key placement (never committed, never baked into an image):
-#   - Runner side: /srv/javaquest-runner/.env holds RUNNER_KEY (mode 600).
-#   - Site side: the site app server env holds the same value as
-#     RUNNER_KEY plus RUNNER_URL above (lib/server/env.ts, ADR-0002).
-# Rotation is an env-only operation: generate a new value, write it to
-# both places, recreate both services. See README.md.
+# Piston is never published directly. Coolify generates the key as
+# SERVICE_PASSWORD_64_RUNNERKEY (never committed); mirror it on the
+# site app as RUNNER_KEY.
 services:
   piston:
     image: ghcr.io/engineer-man/piston:latest
-    container_name: javaquest-runner-piston
     privileged: true # required: Piston creates namespaces/cgroups per job (host must be cgroup v2)
     restart: unless-stopped
     volumes:
@@ -40,21 +34,19 @@ services:
       PISTON_MAX_CONCURRENT_JOBS: "4"
     expose:
       - "2000"
-    networks:
-      - edge
 
   gateway:
     image: docker.io/library/caddy:2-alpine
-    container_name: javaquest-runner-gateway
     restart: unless-stopped
     depends_on:
       - piston
     environment:
-      # Read from /srv/javaquest-runner/.env on the server (mode 600).
-      # Must not contain whitespace: it is interpolated into a Caddyfile
-      # header matcher line at startup. Generate with
-      # `openssl rand -base64 48`.
-      RUNNER_KEY: ${RUNNER_KEY}
+      # Coolify magic var: generated once, persisted, visible in Coolify env UI.
+      # Copy SERVICE_PASSWORD_64_RUNNERKEY to the site app as RUNNER_KEY.
+      # Must not contain whitespace: interpolated into a Caddyfile
+      # header-matcher line at startup. Rotate with `openssl rand -base64 48`.
+      RUNNER_KEY: ${SERVICE_PASSWORD_64_RUNNERKEY}
+      # No SERVICE_FQDN_* here since #26: no public route to the gateway.
     command:
       - sh
       - -c
@@ -63,12 +55,6 @@ services:
         exec caddy run --config /etc/caddy/Caddyfile
     expose:
       - "80"
-    networks:
-      - edge
 
 volumes:
   piston_data:
-
-networks:
-  edge:
-    external: true
