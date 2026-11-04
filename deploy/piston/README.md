@@ -59,6 +59,19 @@ gateway over the internal server-network address below.
   - public `https://satyakisjava.bongbetic.com/api/v2/runtimes` →
     `503`, gateway FQDN null on both sub-applications (that was the
     #26 state; since #27 the same path answers the site's `404`).
+- Final learner-domain proof (#23, live 2026-11-04, final address
+  `https://satyakisjava.bongbetic.com` serving the site only):
+  - transport: TLS 1.3, certificate verifies clean;
+  - pages `/`, `/levels/1`, `/playground`, `/progress`, `/arena` →
+    all `200`; map greets with Bolt over the Level map;
+  - Level-1 starter-derived program through site `/api/run` → `ok`,
+    `Bolt is awake!` (Pass follows by the judge output-plus-token
+    rule); endless program → `time-cap`, no hang;
+  - public `/api/v2/runtimes` on the learner domain → site `404`,
+    never a runner response; gateway still has no public FQDN.
+- Cost observed at deploy time: zero added hosting cost — site app
+  plus runner share the existing family Coolify server `bongbetic`;
+  no new host, no new paid service.
 
 ## Configuration placement (secret values never enter the repo)
 
