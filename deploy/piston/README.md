@@ -26,8 +26,15 @@ gateway over the internal server-network address below.
 - Previous public gateway `https://satyakisjava.bongbetic.com` removed:
   FQDN cleared on the gateway sub-application and the
   `SERVICE_FQDN_GATEWAY_80` declaration dropped from the compose, then
-  redeployed. The old address now answers Traefik `503` (no route) —
-  never a runner answer.
+  redeployed. At that point the old address answered Traefik `503`
+  (no route) — never a runner answer.
+- Learner domain moved to the site (#27, live 2026-11-04): the app
+  `javaquest-site` now serves both `https://satyakisjava.bongbetic.com`
+  and `https://javaquest.51.83.192.166.sslip.io` (Coolify app domains
+  updated via API, then redeployed; no secret touched, no image change
+  beyond the redeploy). The runner stays internal-only: the gateway
+  sub-application still has no public FQDN, and the runner path on the
+  learner domain answers the site's `404`, never a runner response.
 - Key rotated at cutover: the provisioning key (which transited the
   provisioning session) was replaced with a fresh `openssl rand
   -base64 48` value on the service (`SERVICE_PASSWORD_64_RUNNERKEY`
@@ -48,7 +55,8 @@ gateway over the internal server-network address below.
   - endless program → `time-cap` at the cap; socket connect →
     `Network is unreachable` (`runtime` class);
   - public `https://satyakisjava.bongbetic.com/api/v2/runtimes` →
-    `503`, gateway FQDN null on both sub-applications.
+    `503`, gateway FQDN null on both sub-applications (that was the
+    #26 state; since #27 the same path answers the site's `404`).
 
 ## Configuration placement (secret values never enter the repo)
 
