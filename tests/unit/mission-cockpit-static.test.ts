@@ -24,6 +24,7 @@ const SCOPED_SOURCES = [
   "components/radar-summary.tsx",
   "components/drill-card.tsx",
   "components/use-progress-v2.ts",
+  "components/boss-gate.tsx",
   "components/planet-rail.tsx",
   "components/sim-chrome.tsx",
   "lib/cockpit-playback.ts",

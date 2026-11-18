@@ -97,7 +97,18 @@ function toPlaybackTrace(trace: RunMissionResult["trace"]): PlaybackEvent[] {
   });
 }
 
-export function MissionCockpit({ mission }: { mission: Mission }): React.ReactElement {
+export function MissionCockpit({
+  mission,
+  bossPlanet,
+}: {
+  mission: Mission;
+  /**
+   * Boss Gate Part B mode: grades with no Stars through the same
+   * run/grader, records a Boss attempt for this Planet (ADR-0010),
+   * and hides the Rosetta Pair (Part B carries none).
+   */
+  bossPlanet?: string;
+}): React.ReactElement {
   const [language, setLanguage] = useState<CadetLanguage>("python");
   const [pythonCode, setPythonCode] = useState(mission.pythonStarter);
   const [javaCode, setJavaCode] = useState(mission.javaStarter);
@@ -195,9 +206,11 @@ export function MissionCockpit({ mission }: { mission: Mission }): React.ReactEl
           star3Concept: mission.star3Concept,
           seedPool: mission.seedPool,
           layout: mission.layout,
+          ...(bossPlanet === undefined ? {} : { isBossPartB: true as const }),
         },
         progress,
         conceptName: mission.planetConceptId,
+        ...(bossPlanet === undefined ? {} : { bossPlanet }),
         date: localDateString(new Date()),
       });
       setResult(out);
@@ -412,7 +425,7 @@ export function MissionCockpit({ mission }: { mission: Mission }): React.ReactEl
                     ))}
                   </ul>
                 )}
-                {result.result.pass && (
+                {result.result.pass && bossPlanet === undefined && (
                   <ul className="cockpit-rosetta">
                     <li>Python: {mission.rosetta.python.split("\n")[0]}…</li>
                     <li>Java: {mission.rosetta.java.split("\n")[0]}…</li>

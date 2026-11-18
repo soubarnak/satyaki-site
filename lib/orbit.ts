@@ -38,7 +38,7 @@ export interface OrbitBossEntry {
   slug: string;
   title: string;
   state: OrbitBossState;
-  /** Null when locked. Boss Gate flow lands in #70; Part B slug for now. */
+  /** Null when locked. Points at the Boss Gate flow (`/missions/[bossSlug]`). */
   href: string | null;
 }
 
@@ -142,7 +142,7 @@ export function orbitView(
         slug: pack.boss.slug,
         title: pack.boss.title,
         state: bossState,
-        href: bossState === "locked" ? null : missionHref(pack.boss.partB.slug),
+        href: bossState === "locked" ? null : missionHref(pack.boss.slug),
       },
       score: scoreOf.get(slug) ?? 0,
     };
