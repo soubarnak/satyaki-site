@@ -464,7 +464,10 @@ function isValidWorld(value: unknown): value is AuthoredLayout {
 function sanitizeGoals(value: unknown): PassCheck[] {
   if (!Array.isArray(value)) return [];
   const out: PassCheck[] = [];
-  for (const g of value.slice(0, 3)) {
+  // ADR-0014: 1-3 goals; a reach-cell goal expands to one check per axis,
+  // so up to 9 flattened checks survive sanitization (content precedent:
+  // a reach objective pairs a ship.x check with a lane check).
+  for (const g of value.slice(0, 9)) {
     if (typeof g !== "object" || g === null) continue;
     const goal = g as Record<string, unknown>;
     if (

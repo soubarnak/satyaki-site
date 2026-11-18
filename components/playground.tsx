@@ -7,7 +7,31 @@
 import { useState } from "react";
 import { parseRunOutcome, type RunOutcome } from "@/lib/lesson-player";
 import { PLAYGROUND_EXAMPLE, playgroundFeedback } from "@/lib/playground";
+import {
+  decodeShareLink,
+  previewShareImport,
+  startSharedChallenge,
+  type ShareData,
+  type SharePreview,
+} from "@/lib/playground";
+import { shareLinkBrokenLine } from "@/lib/kid-errors";
+import { browserProgressV2Storage } from "@/lib/progress-v2-storage";
 import { Bolt } from "./bolt";
+
+type ShareLanding =
+  | { status: "none" }
+  | { status: "preview"; data: ShareData; preview: SharePreview }
+  | { status: "broken" };
+
+/** Read the Share Link landing once: preview data, or broken, or none. */
+function readShareLanding(): ShareLanding {
+  if (typeof window === "undefined") return { status: "none" };
+  const hash = window.location.hash;
+  if (!hash.startsWith("#c=")) return { status: "none" };
+  const decoded = decodeShareLink(hash);
+  if (!decoded.ok) return { status: "broken" };
+  return { status: "preview", data: decoded.data, preview: previewShareImport(decoded.data) };
+}
 
 function submitOutcome(outcome: RunOutcome, status: number): RunOutcome {
   // A refused run (rate limit) still arrives classed per ADR-0005; only
@@ -27,6 +51,26 @@ export function Playground() {
   const [stdout, setStdout] = useState("");
   const [rawError, setRawError] = useState("");
   const [durationMs, setDurationMs] = useState<number | null>(null);
+  // Share Link landing (ADR-0014): preview first, nothing auto-runs.
+  // Read once at mount; the hash is external state the view never writes.
+  const [landing] = useState<ShareLanding>(() => readShareLanding());
+  const [notice, setNotice] = useState("");
+
+  // Start saves a Creation copy and loads its starter; at the cap it blocks.
+  function handleStartChallenge(): void {
+    if (landing.status !== "preview") return;
+    const storage = browserProgressV2Storage();
+    const started = startSharedChallenge(storage.load(), landing.data);
+    if (!started.ok) {
+      setNotice(started.message);
+      return;
+    }
+    storage.save(started.progress);
+    const starter =
+      started.creation.drafts.java !== "" ? started.creation.drafts.java : started.creation.drafts.python;
+    setCode(starter);
+    setNotice(`Saved “${started.creation.title}” to your shelf, Cadet.`);
+  }
 
   async function handleRun(): Promise<void> {
     if (running) return;
@@ -67,6 +111,37 @@ export function Playground() {
     <>
       <h1>Playground</h1>
       <p className="map-intro">Free practise, Cadet. Runs here change no points, badges, or streaks.</p>
+
+      {landing.status === "broken" && (
+        <section aria-label="Shared Challenge">
+          <p className="bolt-bubble" role="status">
+            {shareLinkBrokenLine()}
+          </p>
+        </section>
+      )}
+
+      {landing.status === "preview" && (
+        <section aria-label="Shared Challenge">
+          <h2>Shared Challenge: {landing.preview.title}</h2>
+          <ul>
+            {landing.preview.goalLabels.map((label) => (
+              <li key={label}>{label}</li>
+            ))}
+          </ul>
+          <p>
+            {landing.preview.entityCount} entities, {landing.preview.bounds.maxX}×
+            {landing.preview.bounds.maxZ}×{landing.preview.bounds.maxY} world (
+            {landing.preview.languages.join(" + ")} starter
+            {landing.preview.languages.length === 1 ? "" : "s"}).
+          </p>
+          <div className="lesson-controls">
+            <button type="button" onClick={handleStartChallenge}>
+              Start Challenge
+            </button>
+          </div>
+          {notice !== "" && <p role="status">{notice}</p>}
+        </section>
+      )}
 
       <div className="bolt-row">
         <Bolt size={72} />
