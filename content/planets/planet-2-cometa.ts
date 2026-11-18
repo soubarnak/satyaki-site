@@ -146,7 +146,7 @@ const m4Python = [
   "Then fly east onto the switch.",
 ];
 const m4Java = [
-  "else if tests each answer in order: the chain runs the first true block.",
+  "else if means else-if: the chain tests each answer in order and runs the first true block.",
   "The count ahead could be far, blocked, or short. Turn right when it is blocked.",
   "Then fly east onto the switch.",
 ];
@@ -384,7 +384,7 @@ export const cometaBossGate: BossGate = {
     {
       kind: "spot-bug",
       prompt:
-        "This code should raise the shield only when it is down. Tap the bug.\n    if is_shield_on() == False:\n        move()",
+        "This code should raise the shield only when it is down. Tap the bug.\n    if the shield is down:\n        move()",
       options: [
         "The block flies instead of raising the shield",
         "if needs a number here",
