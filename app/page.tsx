@@ -1,8 +1,11 @@
-import { LevelMap } from "@/components/level-map";
+// Orbit home route `/` (spec §3, issue #68, Variant A from issue #39).
+// Server component, statically prerendered: the map paints before progress
+// arrives and states overlay from the client wrapper with no loading gate.
+// Zero three/monaco JS on this route by construction: only the orbit,
+// radar, and drill modules load here.
 
-// Level map (WF-001) inside the Mission control shell. Progress lives
-// in browser storage only, so the map itself is a client component
-// deriving from the pure core in lib/level-map.ts.
-export default function LevelMapPage() {
-  return <LevelMap />;
+import { OrbitHome } from "@/components/orbit-home";
+
+export default function OrbitHomePage(): React.ReactElement {
+  return <OrbitHome />;
 }

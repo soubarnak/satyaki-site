@@ -1,32 +1,19 @@
 "use client";
 
-// The persistent planet left rail of the Mission control shell
-// (ADR-0008): the ordered level map in compact form, present on every
-// learner view. States read locked / open / passed in text, never by
-// colour alone; locked planets are not links (FR-002).
+// Persistent Planet rail (ADR-0008): the orbit map in compact form, present
+// on every learner view. Planet states read Locked/Open in text, never by
+// colour alone. Renders instantly from the empty record and overlays real
+// states when progress arrives: no loading gate. Links land on the Planet
+// panel anchors on `/`; Mission routes arrive with the cockpit (#69).
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { levelMapView } from "@/lib/level-map";
 import { localDateString } from "@/lib/progress";
+import { PLANET_PACKS } from "@/lib/planet-packs";
+import { orbitView } from "@/lib/orbit";
 import { Bolt } from "./bolt";
-import { useProgress } from "./use-progress";
+import { useProgressV2 } from "./use-progress-v2";
 
-// Muted planet tints, presentation only; state always travels as text.
-const PLANET_TINTS = [
-  "#e8b04b",
-  "#7fb3d5",
-  "#a3c585",
-  "#d98c8c",
-  "#b39ddb",
-  "#90a4ae",
-  "#f0e68c",
-  "#80cbc4",
-  "#bcb8b1",
-  "#ffcc80",
-];
-
-export function PlanetOrb({ index, label }: { index: number; label: string }) {
+export function PlanetOrb({ index, label }: { index: number; label: string }): React.ReactElement {
   return (
     <span
       className="planet-orb"
@@ -38,55 +25,48 @@ export function PlanetOrb({ index, label }: { index: number; label: string }) {
   );
 }
 
-export function PlanetRail() {
-  const pathname = usePathname();
-  const { progress, loaded } = useProgress();
-  const view = levelMapView(progress, localDateString(new Date()));
+const PLANET_TINTS = ["#e8b04b", "#7fb3d5", "#a3c585", "#d98c8c", "#b39ddb"];
+
+export function PlanetRail(): React.ReactElement {
+  const { progress } = useProgressV2();
+  const view = orbitView(progress, PLANET_PACKS, localDateString(new Date()));
 
   return (
     <aside className="planet-rail">
       <div className="rail-brand">
         <Bolt size={44} />
-        <span className="rail-brand-name">JavaQuest</span>
+        <span className="rail-brand-name">Satyaki Space Coder</span>
       </div>
-      {/* No planet states until the stored record loads (see level map). */}
-      {loaded && (
       <nav aria-label="Planets">
         <ol className="rail-list">
-          {view.entries.map((entry, index) => {
-            const { level, state, href } = entry;
+          {view.planets.map((planet, index) => {
+            const passed = planet.missions.filter((m) => m.state === "passed").length;
+            const stateWord = planet.locked ? "Locked" : planet.boss.state === "passed" ? "Gate passed" : "Open";
             const inner = (
               <>
-                <PlanetOrb index={index} label={String(level.id)} />
+                <PlanetOrb index={index} label={planet.name.slice(0, 1)} />
                 <span className="rail-planet-text">
-                  <span className="rail-planet-name">{level.planet}</span>
+                  <span className="rail-planet-name">{planet.name}</span>
                   <span className="rail-planet-state">
-                    Level {level.id} · {stateLabel(state)}
+                    {passed} of 5 Missions · {stateWord}
                   </span>
                 </span>
               </>
             );
             return (
-              <li key={level.id}>
-                {href === null ? (
-                  <span className="rail-planet rail-planet-locked" aria-disabled="true">
-                    {inner}
-                  </span>
-                ) : (
-                  <Link
-                    className="rail-planet"
-                    href={href}
-                    aria-current={pathname === href ? "page" : undefined}
-                  >
-                    {inner}
-                  </Link>
-                )}
+              <li key={planet.planet}>
+                <Link
+                  className={`rail-planet${planet.locked ? " rail-planet-locked" : ""}`}
+                  href={`/#planet-${planet.planet}`}
+                  aria-disabled={planet.locked ? true : undefined}
+                >
+                  {inner}
+                </Link>
               </li>
             );
           })}
         </ol>
       </nav>
-      )}
     </aside>
   );
 }

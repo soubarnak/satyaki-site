@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 // Placeholder pass over the ADR-0007 route skeleton.
 const routes: Array<[string, string, boolean?]> = [
-  ["/", "JavaQuest"],
+  ["/", "Satyaki Space Coder"],
   ["/levels/1", "Level 1"],
   ["/playground", "Playground"],
   ["/arena", "Robot arena"],

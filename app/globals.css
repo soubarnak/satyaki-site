@@ -591,6 +591,96 @@ button.level-card-locked:hover {
   color: var(--text);
 }
 
+/* Orbit home map (spec §3, Variant A): sun with concentric SVG orbits. */
+.orbit-svg {
+  width: 100%;
+  max-width: 36rem;
+  height: auto;
+  display: block;
+  margin-bottom: 1.3rem;
+  color: var(--text-dim);
+}
+
+.orbit-sun-label {
+  fill: #1a1405;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.orbit-planet-label {
+  fill: var(--text);
+  font-weight: bold;
+  font-size: 1.05rem;
+}
+
+.orbit-planet-state {
+  fill: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.orbit-sync-note {
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+}
+
+.orbit-planets {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  margin-bottom: 1.6rem;
+}
+
+.orbit-planet-name {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 1.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.orbit-planet-meta {
+  color: var(--text-dim);
+  margin-bottom: 0.8rem;
+}
+
+.state-locked {
+  background: transparent;
+}
+
+/* Skill Radar summary and Daily Recall Drill card (spec §6, ADR-0015). */
+.radar-summary,
+.drill-card {
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 0.9rem;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.3rem;
+}
+
+.radar-summary h2,
+.drill-card h2 {
+  margin-bottom: 0.2rem;
+}
+
+.radar-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.radar-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.radar-planet {
+  font-weight: bold;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

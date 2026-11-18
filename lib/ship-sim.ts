@@ -548,7 +548,7 @@ export class ShipSim {
 
   private step(
     action: string,
-    run: () => { blocked: boolean; reason?: string; changed: string[] },
+    run: () => { blocked: boolean; reason?: BlockReason; changed: string[] },
   ): ShipDelta {
     const cost = ENERGY_COSTS[action] ?? 0;
     this.stepsUsed += 1;
@@ -590,7 +590,7 @@ export class ShipSim {
     return "empty";
   }
 
-  private tryEnter(x: number, y: number, z: number): { blocked: boolean; reason?: string; changed: string[] } {
+  private tryEnter(x: number, y: number, z: number): { blocked: boolean; reason?: BlockReason; changed: string[] } {
     if (!inBounds(this.bounds, x, y, z)) {
       return { blocked: true, reason: "wall", changed: [] };
     }

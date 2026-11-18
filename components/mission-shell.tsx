@@ -16,9 +16,9 @@ export function MissionShell({ children }: { children: ReactNode }) {
       <div className="shell-main">
         <header className="shell-header">
           <nav aria-label="Main" className="shell-nav">
-            <Link href="/">Level map</Link>
+            <Link href="/">Orbit map</Link>
             <Link href="/playground">Playground</Link>
-            <Link href="/arena">Robot arena</Link>
+            <Link href="/arena">Arena</Link>
             <Link href="/progress">Progress</Link>
           </nav>
         </header>

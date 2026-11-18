@@ -3,8 +3,8 @@ import { MissionShell } from "@/components/mission-shell";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "JavaQuest",
-  description: "Learn Java on a space-robot quest with Bolt.",
+  title: "Satyaki Space Coder",
+  description: "Learn Python and Java on a 3D space coding quest, Cadet.",
 };
 
 // Every learner view renders inside the Mission control shell
