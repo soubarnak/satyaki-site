@@ -3,7 +3,8 @@
 
 import type { PlanetPack } from "@/lib/content";
 import { cometaPack } from "./planet-2-cometa";
+import { luminaPack } from "./planet-3-lumina";
 import { voltaPack } from "./planet-1-volta";
 import { foundryPack } from "./planet-4-foundry";
 
-export const CONTENT_PACKS: PlanetPack[] = [voltaPack, cometaPack, foundryPack];
+export const CONTENT_PACKS: PlanetPack[] = [voltaPack, cometaPack, luminaPack, foundryPack];

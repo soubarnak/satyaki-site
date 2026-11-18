@@ -200,7 +200,7 @@ export function describePack(pack: PlanetPack, oracle: PackOracle): void {
     }, "scaffold calls Ship action");
     rejects("a changed ship heading", (p) => { m(p).layout.shipStart.heading = "south"; }, "shipStart disagrees");
     rejects("a changed check timing", (p) => { m(p).checks[0].timing = "intermediate"; }, "Pass checks disagree");
-    rejects("a changed Star 3 concept", (p) => { m(p).star3Concept = "loop"; }, "star3Concept is not");
+    rejects("a changed Star 3 concept", (p) => { m(p).star3Concept = oracle.planet.planetConceptId === "loop" ? "variable" : "loop"; }, "star3Concept is not");
     rejects("a story over 280 characters", (p) => { m(p).story = "x".repeat(281); }, "story must be 1-280");
     rejects("a Seed count that disagrees with the tier", (p) => { m(p).seedPool.push(999); }, "seedPool needs exactly");
     rejects("a Par that disagrees with the formula", (p) => { m(p).par.maxSteps += 1; }, "Par disagrees");
