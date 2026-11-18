@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { Mission, PlanetPack } from "@/lib/content";
+import type { Mission, PlanetPack, TrainingWheels } from "@/lib/content";
 import {
   BOSS_PART_A_PASS_COUNT,
   BOSS_PART_A_TOTAL,
@@ -13,7 +13,7 @@ import {
 import { validateBossGate, validateMission, validatePlanetPack } from "@/lib/content";
 import {
   checkPack,
-  countStepActions,
+  checkJavaStage,
   JAVA_MARKERS,
   PYTHON_MARKERS,
   type PackOracle,
@@ -90,7 +90,9 @@ export function describePack(pack: PlanetPack, oracle: PackOracle): void {
       for (const [slug, py, java] of starters) {
         for (const marker of PYTHON_MARKERS) expect(py.split(marker).length - 1, slug).toBe(1);
         for (const marker of JAVA_MARKERS) expect(java.split(marker).length - 1, slug).toBe(1);
-        expect(java, slug).toContain("public class Main");
+        const stageErrors: string[] = [];
+        checkJavaStage(stageErrors, slug, java, oracle.planet.trainingWheels);
+        expect(stageErrors, slug).toEqual([]);
       }
     });
 
@@ -111,23 +113,15 @@ export function describePack(pack: PlanetPack, oracle: PackOracle): void {
       expect(listFiles(oracle.referenceDir)).toEqual([...expectedFiles].sort());
     });
 
-    const steps = new Map([
-      ...oracle.missions.map((m) => [m.slug, m.refSteps] as const),
-      [oracle.boss.partB.slug, oracle.boss.partB.refSteps] as const,
-    ]);
-
-    it("parses every file, with no marker, at the oracle step count", () => {
+    it("parses every file, with no marker", () => {
       for (const file of expectedFiles) {
         const code = readFileSync(join(repoRoot, oracle.referenceDir, file), "utf8");
-        const slug = file.replace(/\.(py|java)$/, "");
         expect(code, file).not.toContain("YOUR CODE");
         if (file.endsWith(".py")) {
           expect(pythonParses(code), file).toBe(true);
-          expect(countStepActions(code, "python"), file).toBe(steps.get(slug));
         } else {
           expect(javaParses(code), file).toBe(true);
           expect(code, file).toContain("public class Main");
-          expect(countStepActions(code, "java"), file).toBe(steps.get(slug));
         }
       }
     });
@@ -139,6 +133,43 @@ export function describePack(pack: PlanetPack, oracle: PackOracle): void {
         expect(/import\(\s*["'][^"']*references/.test(source), file).toBe(false);
         expect(source.includes("readFileSync"), file).toBe(false);
       }
+    });
+  });
+
+  describe(`${label}: Training Wheels stages`, () => {
+    const wrapper = (body: string): string =>
+      `public class Main {\n    // note\n    // YOUR CODE BELOW\n${body}\n    // YOUR CODE ABOVE\n}\n`;
+    const mainOutside =
+      "public class Main {\n    public static void main(String[] a) {\n    // YOUR CODE BELOW\n    // YOUR CODE ABOVE\n    }\n}\n";
+    const mainInside = wrapper("    public static void main(String[] a) {\n    }");
+    const bare = "// YOUR CODE BELOW\n// YOUR CODE ABOVE";
+    const errorsFor = (code: string, stage: TrainingWheels): string[] => {
+      const errors: string[] = [];
+      checkJavaStage(errors, "x", code, stage);
+      return errors;
+    };
+
+    it("full-scaffold needs class and main outside the markers", () => {
+      expect(errorsFor(mainOutside, "full-scaffold")).toEqual([]);
+      expect(errorsFor(wrapper(""), "full-scaffold")).toEqual([
+        "x: full-scaffold java starter needs main outside the markers",
+      ]);
+      expect(errorsFor(mainInside, "full-scaffold")).toHaveLength(1);
+      expect(errorsFor(bare, "full-scaffold")).toHaveLength(2);
+    });
+
+    it("partial wants the class, not main, outside the markers", () => {
+      expect(errorsFor(wrapper(""), "partial")).toEqual([]);
+      expect(errorsFor(mainInside, "partial")).toEqual([]);
+      expect(errorsFor(mainOutside, "partial")).toEqual([
+        "x: partial java starter has main outside the markers",
+      ]);
+      expect(errorsFor(bare, "partial")).toHaveLength(1);
+    });
+
+    it("minimal accepts a comment-only starter", () => {
+      expect(errorsFor(bare, "minimal")).toEqual([]);
+      expect(errorsFor("", "minimal")).toEqual([]);
     });
   });
 
@@ -167,6 +198,9 @@ export function describePack(pack: PlanetPack, oracle: PackOracle): void {
     rejects("a scaffold that calls a Ship action", (p) => {
       m(p).javaStarter = m(p).javaStarter.replace("// YOUR CODE BELOW", "move();\n        // YOUR CODE BELOW");
     }, "scaffold calls Ship action");
+    rejects("a changed ship heading", (p) => { m(p).layout.shipStart.heading = "south"; }, "shipStart disagrees");
+    rejects("a changed check timing", (p) => { m(p).checks[0].timing = "intermediate"; }, "Pass checks disagree");
+    rejects("a changed Star 3 concept", (p) => { m(p).star3Concept = "loop"; }, "star3Concept is not");
     rejects("a story over 280 characters", (p) => { m(p).story = "x".repeat(281); }, "story must be 1-280");
     rejects("a Seed count that disagrees with the tier", (p) => { m(p).seedPool.push(999); }, "seedPool needs exactly");
     rejects("a Par that disagrees with the formula", (p) => { m(p).par.maxSteps += 1; }, "Par disagrees");

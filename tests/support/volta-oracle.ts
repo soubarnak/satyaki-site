@@ -1,11 +1,17 @@
 // Volta oracle: literals from docs/planet-1-volta-content-spec.md.
 
-import type { CheckRow, EntityRow, LayoutOracle, PackOracle } from "./pack-oracle";
+import type { CheckRow, EntityRow, Heading, LayoutOracle, PackOracle } from "./pack-oracle";
 
 const crystal = (id: string, x: number, z: number): EntityRow => [id, "crystal", x, 0, z];
-const lane = (maxX: number, maxZ: number, energy: number, entities: EntityRow[]): LayoutOracle => ({
+const lane = (
+  maxX: number,
+  maxZ: number,
+  energy: number,
+  entities: EntityRow[],
+  heading: Heading = "east",
+): LayoutOracle => ({
   specBounds: { maxX, maxY: 0, maxZ },
-  energy,
+  shipStart: { x: 0, y: 0, z: 0, heading, energy },
   entities,
 });
 const switchGate = (sx: number, sz: number, gx: number, gz: number): EntityRow[] => [
@@ -13,8 +19,8 @@ const switchGate = (sx: number, sz: number, gx: number, gz: number): EntityRow[]
   ["gate-1", "gate", gx, 0, gz],
 ];
 const gateChecks: CheckRow[] = [
-  ["gate-open", "entities.gate-1.open", "eq", true],
-  ["through-gate", "ship.x", "eq", 6],
+  ["gate-open", "entities.gate-1.open", "eq", true, "final"],
+  ["through-gate", "ship.x", "eq", 6, "final"],
 ];
 const launchLayout = lane(8, 2, 30, [
   ...switchGate(5, 0, 6, 0),
@@ -29,6 +35,7 @@ export const voltaOracle: PackOracle = {
     name: "Volta",
     themeId: "volta-launchpad",
     planetConceptId: "variable",
+    trainingWheels: "full-scaffold",
   },
   missions: [
     {
@@ -42,8 +49,8 @@ export const voltaOracle: PackOracle = {
       refEnergy: 3,
       par: { maxSteps: 7, maxEnergy: 7 },
       checks: [
-        ["reach-pad", "ship.x", "eq", 3],
-        ["reach-pad-lane", "ship.z", "eq", 0],
+        ["reach-pad", "ship.x", "eq", 3, "final"],
+        ["reach-pad-lane", "ship.z", "eq", 0, "final"],
       ],
       layout: lane(5, 2, 20, [crystal("crystal-1", 1, 2)]),
     },
@@ -58,8 +65,8 @@ export const voltaOracle: PackOracle = {
       refEnergy: 5,
       par: { maxSteps: 10, maxEnergy: 10 },
       checks: [
-        ["hit-switch", "entities.switch-1.on", "eq", true],
-        ["reach-switch", "ship.x", "eq", 5],
+        ["hit-switch", "entities.switch-1.on", "eq", true, "final"],
+        ["reach-switch", "ship.x", "eq", 5, "final"],
       ],
       layout: lane(7, 2, 24, [...switchGate(5, 0, 6, 0), crystal("crystal-1", 2, 2)]),
     },
@@ -74,10 +81,10 @@ export const voltaOracle: PackOracle = {
       refEnergy: 4,
       par: { maxSteps: 8, maxEnergy: 8 },
       checks: [
-        ["hit-switch", "entities.switch-1.on", "eq", true],
-        ["reach-switch", "ship.z", "eq", 4],
+        ["hit-switch", "entities.switch-1.on", "eq", true, "final"],
+        ["reach-switch", "ship.z", "eq", 4, "final"],
       ],
-      layout: lane(2, 6, 24, [...switchGate(0, 4, 0, 5), crystal("crystal-1", 2, 1)]),
+      layout: lane(2, 6, 24, [...switchGate(0, 4, 0, 5), crystal("crystal-1", 2, 1)], "north"),
     },
     {
       slug: "p1-m4",
@@ -90,8 +97,8 @@ export const voltaOracle: PackOracle = {
       refEnergy: 5,
       par: { maxSteps: 10, maxEnergy: 10 },
       checks: [
-        ["reach-far-pad", "ship.x", "eq", 4],
-        ["shield-up", "ship.shield", "eq", true],
+        ["reach-far-pad", "ship.x", "eq", 4, "final"],
+        ["shield-up", "ship.shield", "eq", true, "final"],
       ],
       layout: lane(6, 2, 24, [crystal("crystal-1", 3, 2)]),
     },
@@ -124,7 +131,7 @@ export const voltaOracle: PackOracle = {
       seedPool: [601, 602, 603],
       refSteps: 7,
       refEnergy: 7,
-      checks: [...gateChecks, ["shield-up", "ship.shield", "eq", true]],
+      checks: [...gateChecks, ["shield-up", "ship.shield", "eq", true, "final"]],
       layout: launchLayout,
     },
   },

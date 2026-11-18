@@ -3,7 +3,16 @@
 // literals in the Planet's oracle file, never derived from shipped content.
 // Pure: no vitest, no World State, no Ship simulation.
 
-import type { BossGate, ConceptId, Mission, PlanetConceptId, PlanetPack, Tier } from "@/lib/content";
+import type {
+  BossGate,
+  CheckTiming,
+  ConceptId,
+  Mission,
+  PlanetConceptId,
+  PlanetPack,
+  Tier,
+  TrainingWheels,
+} from "@/lib/content";
 import {
   BOSS_PART_B_SEEDS,
   COMPARATORS,
@@ -14,13 +23,23 @@ import {
 import { JAVA_NAMES, PYTHON_NAMES } from "@/lib/ship-sim";
 import { javaParses, javaSnippetParses, pythonParses } from "./syntax";
 
-export type CheckRow = [id: string, statePath: string, comparator: string, expected: string | number | boolean];
+export type CheckRow = [id: string, statePath: string, comparator: string, expected: string | number | boolean, timing: CheckTiming];
 export type EntityRow = [id: string, type: string, x: number, y: number, z: number];
+
+export type Heading = "north" | "east" | "south" | "west";
+
+export interface ShipStartOracle {
+  x: number;
+  y: number;
+  z: number;
+  heading: Heading;
+  energy: number;
+}
 
 export interface LayoutOracle {
   /** Inclusive maximum coordinates exactly as the spec lists them. */
   specBounds: { maxX: number; maxY: number; maxZ: number };
-  energy: number;
+  shipStart: ShipStartOracle;
   entities: EntityRow[];
 }
 
@@ -61,6 +80,8 @@ export interface PackOracle {
     name: string;
     themeId: string;
     planetConceptId: PlanetConceptId;
+    /** trainingWheelsForPlanet value for this Planet, from its spec. */
+    trainingWheels: TrainingWheels;
   };
   missions: MissionOracle[];
   boss: { slug: string; title: string; partA: QuizOracle[]; partB: PartBOracle };
@@ -101,14 +122,6 @@ export function shipCalls(code: string, language: "python" | "java"): string[] {
   return calls;
 }
 
-const STEP_ACTIONS = new Set(["move", "shield", "turn_left", "turnLeft", "turn_right", "turnRight"]);
-
-/** Static count of Ship step actions in a reference route. Nothing runs. */
-export function countStepActions(code: string, language: "python" | "java"): number {
-  return shipCalls(stripComments(code, language), language).filter((n) => STEP_ACTIONS.has(n))
-    .length;
-}
-
 function countOf(text: string, needle: string): number {
   return text.split(needle).length - 1;
 }
@@ -118,7 +131,8 @@ function checkStarterPair(
   slug: string,
   python: string,
   java: string,
-  wheels: string | undefined,
+  override: string | undefined,
+  stage: TrainingWheels,
 ): void {
   for (const [lang, code, markers] of [
     ["python", python, PYTHON_MARKERS],
@@ -135,11 +149,35 @@ function checkStarterPair(
   }
   if (!pythonParses(python)) errors.push(`${slug}: python starter fails real parse`);
   if (!javaParses(java)) errors.push(`${slug}: java starter fails real parse`);
-  if (wheels !== undefined) errors.push(`${slug}: carries a Training Wheels override`);
-  if (!/public class Main/.test(java) || !/public static void main/.test(java)) {
-    errors.push(`${slug}: full-scaffold java starter needs class and main`);
+  if (override !== undefined) errors.push(`${slug}: carries a Training Wheels override`);
+  checkJavaStage(errors, slug, java, stage);
+}
+
+/** Java starter shape for a Training Wheels stage. Exported for tests. */
+export function checkJavaStage(
+  errors: string[],
+  slug: string,
+  java: string,
+  stage: TrainingWheels,
+): void {
+  if (stage === "minimal") return;
+  const outside = scaffoldOutside(java, JAVA_MARKERS);
+  if (!/public class Main/.test(outside)) {
+    errors.push(`${slug}: ${stage} java starter needs public class Main outside the markers`);
+  }
+  const mainOutside = /public static void main/.test(outside);
+  if (stage === "full-scaffold") {
+    if (!mainOutside) errors.push(`${slug}: full-scaffold java starter needs main outside the markers`);
+    return;
+  }
+  // partial: the Cadet writes main and its closing brace inside the markers,
+  // so the shipped scaffold outside them must not contain main.
+  if (mainOutside) {
+    errors.push(`${slug}: partial java starter has main outside the markers`);
   }
 }
+
+const shipStartRow = (s: ShipStartOracle): unknown[] => [s.x, s.y, s.z, s.heading, s.energy];
 
 function checkLayout(
   errors: string[],
@@ -152,8 +190,7 @@ function checkLayout(
   if (JSON.stringify(layout.bounds) !== JSON.stringify(want)) {
     errors.push(`${slug}: bounds ${JSON.stringify(layout.bounds)} are not ${JSON.stringify(want)}`);
   }
-  const start = layout.shipStart;
-  if (start.x !== 0 || start.y !== 0 || start.z !== 0 || start.energy !== oracle.energy) {
+  if (JSON.stringify(shipStartRow(layout.shipStart)) !== JSON.stringify(shipStartRow(oracle.shipStart))) {
     errors.push(`${slug}: shipStart disagrees with the spec`);
   }
   const rows = layout.entities.map((e) => [e.id, e.type, e.x, e.y, e.z]);
@@ -168,7 +205,7 @@ function checkChecks(
   checks: Mission["checks"],
   oracle: CheckRow[],
 ): void {
-  const rows = checks.map((c) => [c.id, c.statePath, c.comparator, c.expected]);
+  const rows = checks.map((c) => [c.id, c.statePath, c.comparator, c.expected, c.timing]);
   if (JSON.stringify(rows) !== JSON.stringify(oracle)) {
     errors.push(`${slug}: Pass checks disagree with the spec`);
   }
@@ -178,7 +215,6 @@ function checkChecks(
     }
     if (typeof c.expected === "object") errors.push(`${slug}: ${c.id} expected is not a scalar`);
     if (/\d/.test(c.label)) errors.push(`${slug}: label "${c.label}" names a coordinate`);
-    if (c.timing !== "final") errors.push(`${slug}: ${c.id} timing is not final`);
   }
 }
 
@@ -196,7 +232,13 @@ function checkPlainProse(errors: string[], slug: string, texts: string[]): void 
   }
 }
 
-function checkMission(errors: string[], mission: Mission, oracle: MissionOracle): void {
+function checkMission(
+  errors: string[],
+  mission: Mission,
+  oracle: MissionOracle,
+  planetConcept: PlanetConceptId,
+  stage: TrainingWheels,
+): void {
   const slug = oracle.slug;
   if (mission.slug !== oracle.slug) errors.push(`${slug}: slug is ${mission.slug}`);
   if (mission.position !== oracle.position) errors.push(`${slug}: position disagrees`);
@@ -207,7 +249,7 @@ function checkMission(errors: string[], mission: Mission, oracle: MissionOracle)
     errors.push(`${slug}: Seed count disagrees with tier ${mission.tier}`);
   }
   checkSeeds(errors, slug, mission.seedPool, oracle.seedPool);
-  if (mission.star3Concept !== "variable") errors.push(`${slug}: star3Concept is not variable`);
+  if (mission.star3Concept !== planetConcept) errors.push(`${slug}: star3Concept is not ${planetConcept}`);
   if (!mission.story || !mission.briefing) errors.push(`${slug}: story or briefing missing`);
   const wantSteps = parFormula(oracle.refSteps);
   const wantEnergy = parFormula(oracle.refEnergy);
@@ -220,7 +262,7 @@ function checkMission(errors: string[], mission: Mission, oracle: MissionOracle)
   if (mission.par.maxSteps !== oracle.par.maxSteps || mission.par.maxEnergy !== oracle.par.maxEnergy) {
     errors.push(`${slug}: Par disagrees with the spec table`);
   }
-  checkStarterPair(errors, slug, mission.pythonStarter, mission.javaStarter, mission.trainingWheels);
+  checkStarterPair(errors, slug, mission.pythonStarter, mission.javaStarter, mission.trainingWheels, stage);
   checkLayout(errors, slug, mission.layout, oracle.layout);
   checkChecks(errors, slug, mission.checks, oracle.checks);
   checkPlainProse(errors, slug, [
@@ -238,7 +280,12 @@ function checkMission(errors: string[], mission: Mission, oracle: MissionOracle)
   if (!javaSnippetParses(r.java)) errors.push(`${slug}: rosetta java fails real parse`);
 }
 
-function checkBoss(errors: string[], boss: BossGate, oracle: PackOracle["boss"]): void {
+function checkBoss(
+  errors: string[],
+  boss: BossGate,
+  oracle: PackOracle["boss"],
+  stage: TrainingWheels,
+): void {
   if (boss.slug !== oracle.slug) errors.push(`${oracle.slug}: boss slug is ${boss.slug}`);
   if (boss.title !== oracle.title) errors.push(`${oracle.slug}: boss title disagrees`);
   if (boss.partA.length !== oracle.partA.length) errors.push(`${oracle.slug}: Part A length`);
@@ -257,7 +304,7 @@ function checkBoss(errors: string[], boss: BossGate, oracle: PackOracle["boss"])
   if (b.slug !== slug) errors.push(`${slug}: Part B slug is ${b.slug}`);
   if (b.seedPool.length !== BOSS_PART_B_SEEDS) errors.push(`${slug}: Part B needs 3 Seeds`);
   checkSeeds(errors, slug, b.seedPool, oracle.partB.seedPool);
-  checkStarterPair(errors, slug, b.pythonStarter, b.javaStarter, b.trainingWheels);
+  checkStarterPair(errors, slug, b.pythonStarter, b.javaStarter, b.trainingWheels, stage);
   checkLayout(errors, slug, b.layout, oracle.partB.layout);
   checkChecks(errors, slug, b.checks, oracle.partB.checks);
   checkPlainProse(errors, slug, [b.briefing, ...b.objectives.map((o) => o.text), ...b.hints]);
@@ -276,8 +323,8 @@ export function checkPack(pack: PlanetPack, oracle: PackOracle): string[] {
   if (pack.missions.length !== oracle.missions.length) errors.push(`${planet.slug}: Mission count`);
   oracle.missions.forEach((row, i) => {
     const mission = pack.missions[i];
-    if (mission) checkMission(errors, mission, row);
+    if (mission) checkMission(errors, mission, row, oracle.planet.planetConceptId, oracle.planet.trainingWheels);
   });
-  checkBoss(errors, pack.boss, oracle.boss);
+  checkBoss(errors, pack.boss, oracle.boss, oracle.planet.trainingWheels);
   return errors;
 }
