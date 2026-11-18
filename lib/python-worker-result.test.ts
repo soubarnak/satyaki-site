@@ -41,6 +41,19 @@ describe("shapeWorkerResult", () => {
     expect(destroyed).toBe(true);
   });
 
+  it("normalizes a toJs-dropped shipDelta to null", () => {
+    // Pyodide turns harness None into undefined; the contract is null.
+    const withNull = { step: 1, line: 1, kind: "line", locals: {}, shipDelta: null };
+    const dropped = { step: 0, line: 2, kind: "line", locals: {} };
+    const result = shapeWorkerResult(
+      { status: "ok", trace: [withNull, dropped], stdout: "", error: null, stopReason: "none" },
+      snapshot(),
+      "",
+    );
+    expect(result.trace[0]).toBe(withNull);
+    expect(result.trace[1]).toMatchObject({ line: 2, shipDelta: null });
+  });
+
   it("falls back to error on malformed payloads", () => {
     const result = shapeWorkerResult(undefined, snapshot(), "captured");
     expect(result.status).toBe("error");

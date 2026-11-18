@@ -10,6 +10,9 @@ const nextConfig: NextConfig = {
   // with immutable caching. No COOP/COEP here: cross-origin isolation has
   // unverified side effects on auth/embeds, so the worker degrades to
   // terminate-only until headers ship and are verified on Coolify.
+  // Mission language workers are esbuild bundles served from
+  // /workers/*.js (scripts/bundle-workers.mjs), so they always carry
+  // the JavaScript MIME type module workers require.
   async headers() {
     return [
       {

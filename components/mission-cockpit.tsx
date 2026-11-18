@@ -11,6 +11,7 @@
 // grade every Seed through lib/run; only the practice trace replays.
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import type { Mission } from "@/lib/content";
 import {
   clampCursor,
@@ -30,8 +31,33 @@ import { browserProgressV2Storage } from "@/lib/progress-v2-storage";
 import { emptyProgressV2, localDateString, type CadetLanguage } from "@/lib/progress";
 import { generateSeedLayout, ShipSim } from "@/lib/ship-sim";
 import { runMission, type RunMissionResult } from "@/lib/run";
-import { MissionEditor, doneLinesFor } from "./mission-editor";
+import { doneLinesFor } from "./mission-editor";
 import { MissionSimulator } from "./mission-simulator";
+
+// Mission-route-only boundaries: slim Monaco and R3F split into their own
+// chunks, never SSR, never on `/`. Loading states reuse the same-interface
+// fallbacks (textarea editor, 2D SVG replay).
+const MissionMonaco = dynamic(
+  () => import("./mission-monaco").then((module) => module.MissionMonaco),
+  {
+    ssr: false,
+    loading: () => <p className="cockpit-monaco-note">Loading editor…</p>,
+  },
+);
+const MissionSimulatorR3F = dynamic(() => import("./mission-simulator-r3f"), {
+  ssr: false,
+  loading: () => <p className="cockpit-monaco-note">Loading 3D simulator…</p>,
+});
+
+function webgl2Available(): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    const canvas = document.createElement("canvas");
+    return canvas.getContext("webgl2") !== null;
+  } catch {
+    return false;
+  }
+}
 
 function headerFor(mission: Mission): PlaybackHeader {
   const practiceSeed = mission.seedPool[0];
@@ -48,23 +74,27 @@ function headerFor(mission: Mission): PlaybackHeader {
 }
 
 function toPlaybackTrace(trace: RunMissionResult["trace"]): PlaybackEvent[] {
-  return trace.map((event) => ({
-    step: event.step,
-    line: event.line,
-    kind: "line" as const,
-    locals: event.locals,
-    shipDelta:
-      event.shipDelta === null
-        ? null
-        : {
-            action: event.shipDelta.action,
-            blocked: event.shipDelta.blocked,
-            reason: event.shipDelta.reason,
-            ship: { ...event.shipDelta.ship },
-            changed: [...event.shipDelta.changed],
-          },
-    log: event.log,
-  }));
+  return trace.map((event) => {
+    // Harness payloads may omit the key (toJs None); the contract is null.
+    const delta = event.shipDelta ?? null;
+    return {
+      step: event.step,
+      line: event.line,
+      kind: "line" as const,
+      locals: event.locals,
+      shipDelta:
+        delta === null
+          ? null
+          : {
+              action: delta.action,
+              blocked: delta.blocked,
+              reason: delta.reason,
+              ship: { ...delta.ship },
+              changed: [...delta.changed],
+            },
+      log: event.log,
+    };
+  });
 }
 
 export function MissionCockpit({ mission }: { mission: Mission }): React.ReactElement {
@@ -82,6 +112,13 @@ export function MissionCockpit({ mission }: { mission: Mission }): React.ReactEl
   const [hover, setHover] = useState<{ x: number; z: number } | null>(null);
   const [consoleOpen, setConsoleOpen] = useState(true);
   const [hintsShown, setHintsShown] = useState(0);
+  // WebGL2 gate: R3F only renders when the device clears the floor;
+  // otherwise the 2D SVG replay carries the same trace stream.
+  const [webgl2, setWebgl2] = useState<boolean | null>(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs external device capability after mount; first paint matches the server
+    setWebgl2(webgl2Available());
+  }, []);
 
   const code = language === "python" ? pythonCode : javaCode;
   const practiceLayout = useMemo(() => {
@@ -234,7 +271,7 @@ export function MissionCockpit({ mission }: { mission: Mission }): React.ReactEl
               {running ? "Running…" : "Run"}
             </button>
           </div>
-          <MissionEditor
+          <MissionMonaco
             code={code}
             currentLine={event?.line ?? null}
             language={language}
@@ -247,15 +284,27 @@ export function MissionCockpit({ mission }: { mission: Mission }): React.ReactEl
           <p aria-label="Playback position" className="cockpit-hud" role="status">
             {hudLabel(world, cursor, trace.length, event)}
           </p>
-          <MissionSimulator
-            azimuth={azimuth}
-            camera={camera}
-            hover={hover}
-            onAzimuth={setAzimuth}
-            onCamera={setCamera}
-            onHover={setHover}
-            world={world}
-          />
+          {webgl2 === true ? (
+            <MissionSimulatorR3F
+              azimuth={azimuth}
+              camera={camera}
+              hover={hover}
+              onAzimuth={setAzimuth}
+              onCamera={setCamera}
+              onHover={setHover}
+              world={world}
+            />
+          ) : (
+            <MissionSimulator
+              azimuth={azimuth}
+              camera={camera}
+              hover={hover}
+              onAzimuth={setAzimuth}
+              onCamera={setCamera}
+              onHover={setHover}
+              world={world}
+            />
+          )}
         </div>
       </div>
 

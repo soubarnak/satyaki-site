@@ -14,7 +14,10 @@ export interface MissionRun {
   layout: AuthoredLayout;
 }
 
-type WorkerFactory = (url: URL, options: { type: "module" }) => Worker;
+type WorkerFactory = (url: string | URL, options: { type: "module" }) => Worker;
+
+/** Bundled entry (scripts/bundle-workers.mjs): real JavaScript MIME. */
+const WORKER_URL = "/workers/python-worker.js";
 
 let worker: Worker | null = null;
 let nextId = 1;
@@ -32,9 +35,12 @@ export function isPythonWorkerSupported(): boolean {
 }
 
 function createWorker(): Worker {
-  const url = new URL("../workers/python-worker.ts", import.meta.url);
-  const make: WorkerFactory = factoryOverride ?? ((workerUrl, options) => new Worker(workerUrl, options));
-  const instance = make(url, { type: "module" });
+  // Bundled entry stays a plain path: the bundler must not rewrite it into
+  // a raw `.ts` asset copy (wrong MIME, module workers never start).
+  const instance =
+    factoryOverride !== null
+      ? factoryOverride(WORKER_URL, { type: "module" })
+      : new Worker(WORKER_URL, { type: "module" });
   instance.onmessage = (event: MessageEvent) => {
     const data = event.data as { id: number } & PythonRunResult;
     const entry = pending.get(data.id);

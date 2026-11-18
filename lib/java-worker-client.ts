@@ -13,7 +13,10 @@ export interface JavaMissionRun {
   layout: AuthoredLayout;
 }
 
-type WorkerFactory = (url: URL, options: { type: "module" }) => Worker;
+type WorkerFactory = (url: string | URL, options: { type: "module" }) => Worker;
+
+/** Bundled entry (scripts/bundle-workers.mjs): real JavaScript MIME. */
+const WORKER_URL = "/workers/java-worker.js";
 
 let worker: Worker | null = null;
 let nextId = 1;
@@ -31,9 +34,11 @@ export function isJavaWorkerSupported(): boolean {
 }
 
 function createWorker(): Worker {
-  const url = new URL("../workers/java-worker.ts", import.meta.url);
-  const make: WorkerFactory = factoryOverride ?? ((workerUrl, options) => new Worker(workerUrl, options));
-  const instance = make(url, { type: "module" });
+  // Bundled entry stays a plain path (see the Python client).
+  const instance =
+    factoryOverride !== null
+      ? factoryOverride(WORKER_URL, { type: "module" })
+      : new Worker(WORKER_URL, { type: "module" });
   instance.onmessage = (event: MessageEvent) => {
     const data = event.data as { id: number } & JavaRunResult;
     const entry = pending.get(data.id);

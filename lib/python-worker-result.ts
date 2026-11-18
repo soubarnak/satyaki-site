@@ -27,7 +27,20 @@ export function shapeWorkerResult(
   } catch {
     // Ignore teardown failures; the result stands.
   }
-  const trace = Array.isArray(raw["trace"]) ? raw["trace"] : [];
+  // Pyodide `toJs` turns harness `None` into `undefined` (and may drop
+  // the key); the worker contract promises `shipDelta: T | null` on every
+  // event, so normalize the missing case here. Clean traces keep their
+  // identity.
+  function normalizeTraceEvent(entry: unknown): unknown {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return entry;
+    const record = entry as Record<string, unknown>;
+    if (record["shipDelta"] !== undefined) return entry;
+    return { ...record, shipDelta: null };
+  }
+  const rawTrace: unknown[] = Array.isArray(raw["trace"]) ? raw["trace"] : [];
+  const trace = rawTrace.some((entry) => normalizeTraceEvent(entry) !== entry)
+    ? rawTrace.map(normalizeTraceEvent)
+    : rawTrace;
   const stopReason = typeof raw["stopReason"] === "string" ? raw["stopReason"] : "error";
   const status = typeof raw["status"] === "string" ? raw["status"] : "error";
   return {

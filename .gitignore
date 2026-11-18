@@ -43,3 +43,9 @@ next-env.d.ts
 # playwright
 /test-results/
 /playwright-report/
+
+# Generated self-hosted runtimes (rebuilt by predev/prebuild; never commit).
+# Tracked .gitkeep files keep the versioned pyodide dir present.
+/public/pyodide/v*/**
+/public/monaco/**
+/public/workers/

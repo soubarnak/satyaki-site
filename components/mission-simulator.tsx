@@ -8,12 +8,9 @@
 // the same trace stream, so playback, cameras, HUD, and hover inspection
 // work before the R3F dependency lands and below the WebGL2 device floor.
 
-import { useState } from "react";
-import {
-  inspectSquare,
-  type PlaybackCamera,
-  type PlaybackWorld,
-} from "@/lib/cockpit-playback";
+import { useEffect, useState } from "react";
+import type { PlaybackCamera, PlaybackWorld } from "@/lib/cockpit-playback";
+import { SimAzimuth, SimCameraButtons, SimInspect } from "./sim-chrome";
 
 interface MissionSimulatorProps {
   world: PlaybackWorld;
@@ -56,9 +53,12 @@ export function MissionSimulator({
   onAzimuth,
   onHover,
 }: MissionSimulatorProps): React.ReactElement {
-  const [webgl] = useState<boolean | null>(() =>
-    typeof document === "undefined" ? null : webgl2Available(),
-  );
+  // After mount so the first client paint matches the server render.
+  const [webgl, setWebgl] = useState<boolean | null>(null);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncs external device capability after mount; first paint matches the server
+    setWebgl(webgl2Available());
+  }, []);
 
   const maxX = world.bounds.maxX;
   const maxZ = world.bounds.maxZ;
@@ -101,24 +101,7 @@ export function MissionSimulator({
     <section aria-label="Simulator" className="cockpit-sim">
       <div className="cockpit-sim-head">
         <h2>Simulator</h2>
-        <div aria-label="Camera" className="cockpit-cameras" role="group">
-          {(
-            [
-              ["top", "Top-down"],
-              ["chase", "Chase"],
-              ["orbit", "Free orbit"],
-            ] as Array<[PlaybackCamera, string]>
-          ).map(([key, name]) => (
-            <button
-              className={camera === key ? "cockpit-on" : ""}
-              key={key}
-              onClick={() => onCamera(key)}
-              type="button"
-            >
-              {name}
-            </button>
-          ))}
-        </div>
+        <SimCameraButtons camera={camera} onCamera={onCamera} />
       </div>
       {webgl === false && (
         <p className="cockpit-poster" role="note">
@@ -168,23 +151,8 @@ export function MissionSimulator({
           );
         })}
       </svg>
-      <p aria-live="polite" className="cockpit-inspect">
-        {hover ? inspectSquare(world, hover) : "Hover any square to inspect it."}
-        {camera === "orbit" && " Drag to orbit."}
-        {camera === "chase" && " Chase: Ship stays centre, world turns."}
-      </p>
-      {camera === "orbit" && (
-        <label className="cockpit-azimuth">
-          Orbit angle
-          <input
-            max={360}
-            min={0}
-            onChange={(event) => onAzimuth(Number(event.target.value))}
-            type="range"
-            value={azimuth}
-          />
-        </label>
-      )}
+      <SimInspect camera={camera} hover={hover} world={world} />
+      {camera === "orbit" && <SimAzimuth azimuth={azimuth} onAzimuth={onAzimuth} />}
     </section>
   );
 }

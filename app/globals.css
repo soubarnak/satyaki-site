@@ -834,6 +834,37 @@ button.level-card-locked:hover {
   margin-top: 0.35rem;
 }
 
+.cockpit-monaco {
+  min-height: 22rem;
+  border: 2px solid var(--panel-edge);
+  border-radius: 0.7rem;
+  overflow: hidden;
+}
+
+.cockpit-monaco-now {
+  background: rgba(46, 163, 107, 0.35);
+}
+
+.cockpit-monaco-done {
+  background: rgba(159, 195, 216, 0.12);
+}
+
+.cockpit-world-3d {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: block;
+  background: #071724;
+  border: 2px solid var(--panel-edge);
+  border-radius: 0.9rem;
+  overflow: hidden;
+}
+
+.cockpit-world-3d canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
 .cockpit-hud {
   background: var(--panel);
   border: 2px solid var(--panel-edge);

@@ -14,16 +14,26 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "vendor:pyodide": "node scripts/vendor-pyodide.mjs",
-    "vendor:pyodide:check": "node scripts/vendor-pyodide.mjs --check"
+    "vendor:pyodide:check": "node scripts/vendor-pyodide.mjs --check",
+    "vendor:monaco": "node scripts/vendor-monaco.mjs",
+    "vendor:monaco:check": "node scripts/vendor-monaco.mjs --check",
+    "bundle:workers": "node scripts/bundle-workers.mjs",
+    "bundle:workers:check": "node scripts/bundle-workers.mjs --check",
+    "predev": "node scripts/bundle-workers.mjs && node scripts/vendor-monaco.mjs && node scripts/vendor-pyodide.mjs",
+    "prebuild": "node scripts/bundle-workers.mjs && node scripts/vendor-monaco.mjs && node scripts/vendor-pyodide.mjs",
+    "assets:check": "node scripts/bundle-workers.mjs --check && node scripts/vendor-monaco.mjs --check && node scripts/vendor-pyodide.mjs --check"
   },
   "dependencies": {
+    "@react-three/fiber": "9.8.2",
     "drizzle-orm": "^0.45.4",
     "fflate": "^0.8.3",
     "java-parser": "^3.0.1",
+    "monaco-editor": "0.57.0",
     "next": "16.4.3",
     "pg": "^8.23.1",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "three": "0.187.0"
   },
   "devDependencies": {
     "@playwright/test": "^1",
@@ -31,6 +41,8 @@
     "@types/pg": "^8.11.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "0.187.0",
+    "esbuild": "0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "typescript": "^5",

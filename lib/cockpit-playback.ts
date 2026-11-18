@@ -6,7 +6,7 @@
 // undo state. Cameras are manual only: Top-down (default), Chase, Free
 // orbit, no auto-switching.
 
-import { ShipSim, type AuthoredLayout, type Bounds, type WorldSnapshot } from "./ship-sim";
+import { ShipSim, type AuthoredLayout, type Bounds, type ShipDelta, type WorldSnapshot } from "./ship-sim";
 
 export const PLAYBACK_FRAME_MS = 650;
 
@@ -24,20 +24,12 @@ export interface PlaybackShip {
   crystals: number;
 }
 
-export interface PlaybackDelta {
-  action: string;
-  blocked: boolean;
-  reason?: string;
-  ship: PlaybackShip;
-  changed: string[];
-}
-
 export interface PlaybackEvent {
   step: number;
   line: number;
   kind: "line";
   locals: Record<string, unknown>;
-  shipDelta: PlaybackDelta | null;
+  shipDelta: ShipDelta | null;
   log?: string;
 }
 
@@ -62,7 +54,7 @@ export function speedDelayMs(speed: PlaybackSpeed): number {
 
 /** True for a Ship-step frame (gold tick on the scrubber). */
 export function isShipStep(event: PlaybackEvent): boolean {
-  return event.shipDelta !== null;
+  return (event.shipDelta ?? null) !== null;
 }
 
 /** Indices of Ship-step frames, in trace order, for gold ticks. */
@@ -91,7 +83,7 @@ export function playbackWorldAt(
   let ship: PlaybackShip = { ...header.initial.ship };
   const last = Math.min(cursor, trace.length - 1);
   for (let i = 0; i <= last; i += 1) {
-    const delta = trace[i].shipDelta;
+    const delta = trace[i].shipDelta ?? null;
     if (delta === null) continue;
     ship = { ...delta.ship };
   }
@@ -169,7 +161,7 @@ export function replayWorldFromLayout(
   const sim = new ShipSim(layout);
   const last = Math.min(cursor, trace.length - 1);
   for (let i = 0; i <= last; i += 1) {
-    const delta = trace[i].shipDelta;
+    const delta = trace[i].shipDelta ?? null;
     if (delta === null) continue;
     const replayed = sim.call(delta.action, [], trace[i].line);
     if (!replayed.ok) break;

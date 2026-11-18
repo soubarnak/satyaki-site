@@ -3,6 +3,7 @@
 // framework, DOM, or worker imports. Frame = one executed line; step-back
 // is pure re-fold, no undo state.
 import { describe, expect, it } from "vitest";
+import type { ShipState } from "./ship-sim";
 import {
   PLAYBACK_FRAME_MS,
   inspectSquare,
@@ -24,7 +25,7 @@ const HEADER: PlaybackHeader = {
   bounds: { maxX: 6, maxY: 2, maxZ: 4 },
 };
 
-function shipState(x: number, energy: number, crystals: number) {
+function shipState(x: number, energy: number, crystals: number): ShipState {
   return { x, y: 0, z: 2, heading: "east", energy, shield: false, crystals };
 }
 
