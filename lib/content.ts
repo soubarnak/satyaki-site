@@ -216,7 +216,9 @@ function countOccurrences(text: string, needle: string): number {
 /**
  * Lightweight parse check: balanced (), [], {} outside string
  * literals and line comments, plus non-empty code. Java also needs a
- * statement or block marker (`;` or `{`).
+ * statement or block marker (`;` or `{`). With `requireCode: false`
+ * (starters) a comment-only program is valid: Training Wheels `minimal`
+ * Java starters carry comments and markers only.
  */
 export function codeParses(
   language: "python" | "java",
@@ -259,7 +261,7 @@ export function codeParses(
   if (quote !== null || stack.length > 0 || (requireCode && !meaningful)) {
     return false;
   }
-  if (language === "java") return code.includes(";") || code.includes("{");
+  if (language === "java" && requireCode) return code.includes(";") || code.includes("{");
   return true;
 }
 
