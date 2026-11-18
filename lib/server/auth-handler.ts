@@ -35,7 +35,7 @@ import {
 } from "@/lib/auth/validation";
 import type { OtpMailer } from "@/lib/auth/mailer";
 import { newAccountId, type AccountRecord, type AuthStore } from "@/lib/auth/store";
-import { mergeProgressV2, sanitizeProgressV2 } from "@/lib/progress";
+import { emptyProgressV2, loginMergeV2, mergeProgressV2, sanitizeProgressV2 } from "@/lib/progress";
 
 export interface AuthHandlerDeps {
   store: AuthStore;
@@ -319,8 +319,26 @@ export function createAuthHandlers(deps: AuthHandlerDeps) {
         sharedComputer,
       });
       await store.saveSession(record);
+      const serverProgress = account.progressJson
+        ? sanitizeProgressV2(JSON.parse(account.progressJson))
+        : null;
+      if (body?.progress !== undefined && typeof body.progress === "object" && body.progress !== null) {
+        const merged = loginMergeV2(
+          body.progress as Parameters<typeof loginMergeV2>[0],
+          serverProgress ?? emptyProgressV2(account.id),
+          account.id,
+        );
+        account.progressJson = JSON.stringify({ ...merged.progress, owner: account.id });
+        account.progressUpdatedAtMs = nowMs;
+        await store.updateAccount(account);
+        return json(
+          { username: account.username, progress: merged.progress, replaced: merged.replaced },
+          200,
+          { "Set-Cookie": sessionCookie(token, sharedComputer) },
+        );
+      }
       return json(
-        { username: account.username },
+        { username: account.username, progress: serverProgress, replaced: false },
         200,
         { "Set-Cookie": sessionCookie(token, sharedComputer) },
       );
@@ -523,10 +541,11 @@ export function createAuthHandlers(deps: AuthHandlerDeps) {
       const nowMs = now();
       const authed = await getAuthed(store, request, nowMs);
       if (!authed) return json({ error: "Not signed in." }, 401);
+      const progress = authed.account.progressJson
+        ? sanitizeProgressV2(JSON.parse(authed.account.progressJson))
+        : null;
       return json(
-        {
-          progress: authed.account.progressJson ? JSON.parse(authed.account.progressJson) : null,
-        },
+        { progress },
         200,
         authed.refreshedCookie ? { "Set-Cookie": authed.refreshedCookie } : {},
       );
@@ -544,7 +563,8 @@ export function createAuthHandlers(deps: AuthHandlerDeps) {
       const current = authed.account.progressJson
         ? sanitizeProgressV2(JSON.parse(authed.account.progressJson))
         : null;
-      const merged = current ? mergeProgressV2(current, incoming) : incoming;
+      const base = current ? mergeProgressV2(current, incoming) : incoming;
+      const merged = { ...base, owner: authed.account.id };
       authed.account.progressJson = JSON.stringify(merged);
       authed.account.progressUpdatedAtMs = nowMs;
       // Touch the session so idle sync extends the sliding cookie.

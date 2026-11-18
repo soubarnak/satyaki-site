@@ -1,22 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { loginWithLocalProgress } from "@/lib/auth-progress-client";
+import { browserProgressV2Storage } from "@/lib/progress-v2-storage";
 
 export default function LoginPage() {
   const [status, setStatus] = useState("");
   async function onSubmit(form: FormData) {
     setStatus("Signing in…");
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        username: form.get("username"),
-        password: form.get("password"),
+    const storage = browserProgressV2Storage();
+    try {
+      const out = await loginWithLocalProgress(fetch, storage.load(), {
+        username: String(form.get("username") ?? ""),
+        password: String(form.get("password") ?? ""),
         sharedComputer: form.get("shared") === "on",
-      }),
-    });
-    const body = (await res.json().catch(() => ({}))) as { error?: string };
-    setStatus(res.ok ? "Signed in." : (body.error ?? "Failed."));
+      });
+      storage.save(out.progress);
+      setStatus(out.replaced ? "Signed in. This device was reset to your Account." : "Signed in.");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Failed.");
+    }
   }
   return (
     <main>
