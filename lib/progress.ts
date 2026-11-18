@@ -5,6 +5,7 @@
 // behind the adapter in lib/progress-storage.ts.
 
 import { LEVELS, getLevel } from "./levels";
+import { isHangarTier } from "./hangar";
 import { gzipSync, gunzipSync } from "fflate";
 import type { AuthoredLayout } from "./ship-sim";
 import type { PassCheck, PlanetPack } from "./content";
@@ -298,10 +299,10 @@ export interface ProgressV2 {
 }
 
 export const EMPTY_HANGAR_V2: HangarV2 = {
-  hull: "",
-  trim: "",
-  thruster: "",
-  laserColour: "",
+  hull: "training",
+  trim: "training",
+  thruster: "training",
+  laserColour: "training",
 };
 
 export const EMPTY_ARENA_V2: ArenaRecordV2 = {
@@ -352,10 +353,9 @@ function sanitizePassingCode(value: unknown): string | null {
 }
 
 function sanitizeHangarSlot(value: unknown): string {
-  if (typeof value !== "string") return "";
+  if (typeof value !== "string") return "training";
   const t = value.trim();
-  if (t.length === 0) return "";
-  return t.length > 64 ? t.slice(0, 64) : t;
+  return isHangarTier(t) ? t : "training";
 }
 
 function sanitizeMissionLanguage(value: unknown): MissionLanguageV2 {
@@ -1087,8 +1087,13 @@ function mergeArena(a: ArenaRecordV2, b: ArenaRecordV2): ArenaRecordV2 {
 function mergeHangar(a: HangarV2, b: HangarV2): HangarV2 {
   const pick = (x: string, y: string): string => {
     if (x === y) return x;
-    if (x === "") return y;
-    if (y === "") return x;
+    // An unequipped default never overwrites an equipped cosmetic: the
+    // training default is the only value a record holds before its Cadet
+    // equips anything, so preferring the other side keeps equips through
+    // sync (both merge orders) and Save Code import. Two differing
+    // equipped values keep the current (`a`) side, deterministically.
+    if (x === "" || x === "training") return y;
+    if (y === "" || y === "training") return x;
     return x;
   };
   return {

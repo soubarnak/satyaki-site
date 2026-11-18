@@ -649,6 +649,42 @@ button.level-card-locked:hover {
   background: transparent;
 }
 
+/* Hangar cosmetic selection (issue #73, spec §6, catalogue #57). */
+.hangar,
+.hangar-slot {
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 0.9rem;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.3rem;
+}
+
+.hangar-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.hangar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem 1rem;
+}
+
+.hangar-name {
+  font-weight: bold;
+}
+
+.hangar-detail {
+  color: var(--text-dim);
+}
+
+.hangar-state {
+  margin-left: auto;
+}
+
 /* Skill Radar summary and Daily Recall Drill card (spec §6, ADR-0015). */
 .radar-summary,
 .drill-card {

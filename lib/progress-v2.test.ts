@@ -311,3 +311,50 @@ describe("Save Code: round-trip, preview, corruption set", () => {
     expect(JSON.parse(new TextDecoder().decode(raw)).version).toBe(2);
   });
 });
+
+describe("hangar storage (#73: equipped persists through sync and Save Code)", () => {
+  it("empty record equips training in every slot", () => {
+    expect(emptyProgressV2().hangar).toEqual({
+      hull: "training",
+      trim: "training",
+      thruster: "training",
+      laserColour: "training",
+    });
+  });
+
+  it("sanitize falls back an unknown stored slot to training only", () => {
+    const r = parseProgressV2(
+      JSON.stringify({
+        version: 2,
+        missions: {},
+        bosses: {},
+        streakDates: [],
+        hangar: { hull: "ultraviolet", trim: "bronze" },
+        creations: [],
+        arena: {},
+      }),
+    );
+    expect(r.hangar.hull).toBe("training");
+    expect(r.hangar.trim).toBe("bronze");
+  });
+
+  it("merge keeps an equipped cosmetic over the training default in both orders", () => {
+    const equipped: ProgressV2 = {
+      ...emptyProgressV2(),
+      hangar: { hull: "bronze", trim: "training", thruster: "training", laserColour: "training" },
+    };
+    const fresh = emptyProgressV2();
+    expect(mergeProgressV2(fresh, equipped).hangar.hull).toBe("bronze");
+    expect(mergeProgressV2(equipped, fresh).hangar.hull).toBe("bronze");
+  });
+
+  it("Save Code round-trips the equipped set", () => {
+    const equipped: ProgressV2 = {
+      ...emptyProgressV2(),
+      hangar: { hull: "steel", trim: "training", thruster: "training", laserColour: "training" },
+    };
+    const back = decodeSaveCodeV2(encodeSaveCodeV2(equipped));
+    expect(back.ok).toBe(true);
+    if (back.ok) expect(back.record.hangar.hull).toBe("steel");
+  });
+});
