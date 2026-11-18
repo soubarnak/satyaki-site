@@ -12,7 +12,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "vendor:pyodide": "node scripts/vendor-pyodide.mjs",
+    "vendor:pyodide:check": "node scripts/vendor-pyodide.mjs --check"
   },
   "dependencies": {
     "fflate": "^0.8.3",
