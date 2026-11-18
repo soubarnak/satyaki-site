@@ -3,5 +3,6 @@
 
 import type { PlanetPack } from "@/lib/content";
 import { voltaPack } from "./planet-1-volta";
+import { astralPack } from "./planet-5-astral";
 
-export const CONTENT_PACKS: PlanetPack[] = [voltaPack];
+export const CONTENT_PACKS: PlanetPack[] = [voltaPack, astralPack];
