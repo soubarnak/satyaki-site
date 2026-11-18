@@ -291,3 +291,70 @@ def run_learner(code, ship):
         "stopReason": stop,
         "stepsUsed": state["ship_steps"],
     }
+
+
+class _FrozenView:
+    """Read-only attribute view: writes raise AttributeError (kid read-only)."""
+
+    def __init__(self, values):
+        object.__setattr__(self, "_values", dict(values))
+
+    def __getattr__(self, name):
+        values = object.__getattribute__(self, "_values")
+        if name in values:
+            return values[name]
+        raise AttributeError(f"Unknown field: {name}.")
+
+    def __setattr__(self, name, value):
+        raise AttributeError(f"Read-only snapshot field: {name}.")
+
+    def __repr__(self):
+        return repr(object.__getattribute__(self, "_values"))
+
+
+def run_arena_tick(code, ship, radar):
+    """Run one Arena tick: call on_tick(ship, radar), return the action.
+
+    Contract: read-only ship/radar views, exactly one returned string.
+    Returns {action, valid, stdout, error}. Invalid returns waste the
+    tick (valid False); exceptions become structured error frames.
+    """
+    started = time.monotonic()
+    stdout_buf = io.StringIO()
+    ship_view = _FrozenView(ship)
+    radar_view = _FrozenView(radar)
+    learner_globals = {"__name__": "__arena_tick__", "__builtins__": __builtins__}
+    try:
+        compiled = compile(code, FILENAME, "exec")
+    except SyntaxError as exc:
+        return {
+            "action": None,
+            "valid": False,
+            "stdout": "",
+            "error": {"kind": "error", "line": exc.lineno or 0, "excType": type(exc).__name__, "message": str(exc)},
+        }
+    try:
+        with contextlib.redirect_stdout(stdout_buf):
+            if time.monotonic() - started > MAX_WALL_SECONDS:
+                raise _TimeLimit("3 s wall-clock budget exceeded")
+            exec(compiled, learner_globals)
+            tick = learner_globals.get("on_tick")
+            if not callable(tick):
+                return {
+                    "action": None,
+                    "valid": False,
+                    "stdout": stdout_buf.getvalue(),
+                    "error": {"kind": "error", "line": 0, "excType": "NoOnTick", "message": "No on_tick(ship, radar) found."},
+                }
+            action = tick(ship_view, radar_view)
+    except Exception as exc:
+        tb_line = _learner_line(exc.__traceback__)
+        return {
+            "action": None,
+            "valid": False,
+            "stdout": stdout_buf.getvalue(),
+            "error": {"kind": "error", "line": tb_line, "excType": type(exc).__name__, "message": str(exc)},
+        }
+    if isinstance(action, str):
+        return {"action": action, "valid": True, "stdout": stdout_buf.getvalue(), "error": None}
+    return {"action": action if action is None else str(action), "valid": False, "stdout": stdout_buf.getvalue(), "error": None}

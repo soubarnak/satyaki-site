@@ -108,3 +108,65 @@ describe("python harness (CPython oracle)", () => {
     expect(result.trace[0].log).toBe("hi");
   });
 });
+
+// Arena tick seam (ADR-0014): run_arena_tick calls on_tick(ship, radar)
+// with read-only snapshots and returns the one action string.
+function runTick(code: string): {
+  action: unknown;
+  valid: unknown;
+  error: { line: number; excType: string; message: string } | null;
+} {
+  const driver = `
+import json, runpy
+harness = runpy.run_path(${JSON.stringify(HARNESS)})
+run_arena_tick = harness["run_arena_tick"]
+ship = {"x": 1, "y": 0, "z": 6, "heading": "east", "energy": 50, "shield": False, "crystals": 0}
+radar = {"drone_distance": 2, "drone_direction": "ahead", "wave": 1, "drones_left": 2}
+code = ${JSON.stringify(code)}
+print(json.dumps(run_arena_tick(code, ship, radar)))
+`;
+  const out = execFileSync("python3", ["-c", driver], { encoding: "utf8", timeout: 20000 });
+  return JSON.parse(out.trim().split("\n").at(-1)!) as {
+    action: unknown;
+    valid: unknown;
+    error: { line: number; excType: string; message: string } | null;
+  };
+}
+
+describe("python arena tick (CPython oracle)", () => {
+  it("returns the tick action from read-only snapshots", () => {
+    const result = runTick('def on_tick(ship, radar):\n    if radar.drone_distance == 0:\n        return "shield"\n    return "move"\n');
+    expect(result.valid).toBe(true);
+    expect(result.action).toBe("move");
+    expect(result.error).toBeNull();
+  });
+
+  it("reads ship fields by attribute", () => {
+    const result = runTick("def on_tick(ship, radar):\n    return \"move\" if ship.x < 5 else \"wait\"\n");
+    expect(result.action).toBe("move");
+  });
+
+  it("rejects writes to ship and radar snapshots", () => {
+    const shipWrite = runTick("def on_tick(ship, radar):\n    ship.x = 9\n    return \"wait\"\n");
+    expect(shipWrite.error?.excType).toBe("AttributeError");
+    const radarWrite = runTick("def on_tick(ship, radar):\n    radar.wave = 9\n    return \"wait\"\n");
+    expect(radarWrite.error?.excType).toBe("AttributeError");
+  });
+
+  it("rejects unknown snapshot fields", () => {
+    const result = runTick('def on_tick(ship, radar):\n    return ship.turbo\n');
+    expect(result.error?.excType).toBe("AttributeError");
+  });
+
+  it("names a missing on_tick without crashing", () => {
+    const result = runTick("x = 1\n");
+    expect(result.valid).toBe(false);
+    expect(result.error?.excType).toBe("NoOnTick");
+  });
+
+  it("wastes non-string returns without stopping", () => {
+    const result = runTick("def on_tick(ship, radar):\n    return 42\n");
+    expect(result.valid).toBe(false);
+    expect(result.error).toBeNull();
+  });
+});

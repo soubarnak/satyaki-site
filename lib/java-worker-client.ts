@@ -77,6 +77,35 @@ function timeoutResult(): JavaRunResult {
  * with the worker's batched result, or with a time-cap result after the
  * outer deadline terminates and respawns the worker.
  */
+export interface JavaTickRun {
+  code: string;
+  ship: { x: number; y: number; z: number; heading: string; energy: number; shield: boolean; crystals: number };
+  radar: { droneDistance: number; droneDirection: string; wave: number; dronesLeft: number };
+}
+
+/** Run one Arena tick in the Java worker (read-only ship/radar hosts). */
+export function runJavaTick(run: JavaTickRun): Promise<JavaRunResult> {
+  if (!isJavaWorkerSupported()) return Promise.reject(new Error("Java worker needs a browser Worker."));
+  const id = nextId;
+  nextId += 1;
+  return new Promise<JavaRunResult>((resolve) => {
+    const timer = setTimeout(() => {
+      if (!pending.has(id)) return;
+      pending.delete(id);
+      resetJavaWorker();
+      resolve(timeoutResult());
+    }, JAVA_WORKER_TIMEOUT_MS);
+    pending.set(id, { resolve, timer });
+    try {
+      getWorker().postMessage({ id, kind: "tick", code: run.code, ship: run.ship, radar: run.radar });
+    } catch {
+      pending.delete(id);
+      clearTimeout(timer);
+      resolve(timeoutResult());
+    }
+  });
+}
+
 export function runJavaMission(run: JavaMissionRun): Promise<JavaRunResult> {
   if (!isJavaWorkerSupported()) return Promise.reject(new Error("Java worker needs a browser Worker."));
   const id = nextId;

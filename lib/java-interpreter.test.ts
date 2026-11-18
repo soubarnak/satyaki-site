@@ -133,4 +133,38 @@ describe("cadet java arena tick", () => {
     const result = runJavaTick({ code: tickCode, ship, radar: { ...radar, droneDistance: 0 } });
     expect(result.normalized).toBe("shield");
   });
+
+  it("reads ship snapshot fields", () => {
+    const code = `public class Main {\n    public String onTick(Ship ship, Radar radar) {\n        if (ship.x < 5) {\n            return "move";\n        }\n        return "wait";\n    }\n}\n`;
+    const result = runJavaTick({ code, ship, radar });
+    expect(result.normalized).toBe("move");
+  });
+
+  it("rejects writes to ship and radar snapshots as read-only", () => {
+    const shipWrite = `public class Main {\n    public String onTick(Ship ship, Radar radar) {\n        ship.x = 9;\n        return "wait";\n    }\n}\n`;
+    const shipResult = runJavaTick({ code: shipWrite, ship, radar });
+    expect(shipResult.error?.excType).toBe("ReadOnly");
+    const radarWrite = `public class Main {\n    public String onTick(Ship ship, Radar radar) {\n        radar.wave = 9;\n        return "wait";\n    }\n}\n`;
+    const radarResult = runJavaTick({ code: radarWrite, ship, radar });
+    expect(radarResult.error?.excType).toBe("ReadOnly");
+  });
+
+  it("rejects unknown snapshot fields", () => {
+    const code = `public class Main {\n    public String onTick(Ship ship, Radar radar) {\n        if (ship.turbo == 1) {\n            return "move";\n        }\n        return "wait";\n    }\n}\n`;
+    const result = runJavaTick({ code, ship, radar });
+    expect(result.error?.excType).toBe("UnknownName");
+  });
+
+  it("rejects Ship calls inside onTick: the return is the only control", () => {
+    const code = `public class Main {\n    public String onTick(Ship ship, Radar radar) {\n        move();\n        return "wait";\n    }\n}\n`;
+    const result = runJavaTick({ code, ship, radar });
+    expect(result.error?.excType).toBe("ActionInExpression");
+  });
+
+  it("normalizes Java camelCase returns", () => {
+    const code = `public class Main {\n    public String onTick(Ship ship, Radar radar) {\n        return "turnLeft";\n    }\n}\n`;
+    const result = runJavaTick({ code, ship, radar });
+    expect(result.valid).toBe(true);
+    expect(result.normalized).toBe("turn_left");
+  });
 });

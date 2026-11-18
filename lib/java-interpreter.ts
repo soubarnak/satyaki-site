@@ -232,6 +232,9 @@ function emitEvent(runner: Runner, line: number): void {
 }
 
 function runShipCall(runner: Runner, name: string, args: unknown[], line: number, allowAction: boolean): unknown {
+  if (runner.arenaTick) {
+    throw new LearnerError(line, "ActionInExpression", `Ship call ${name}() never runs inside onTick; return one action string.`);
+  }
   if (STEP_SET.has(name) && !allowAction) {
     throw new LearnerError(line, "ActionInExpression", `Ship action ${name}() runs only as its own line.`);
   }

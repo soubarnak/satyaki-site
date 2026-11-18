@@ -1,8 +1,9 @@
 import { Arena } from "@/components/arena";
 
-// Robot arena (WF-004) inside the Mission control shell. Client-side:
-// the gate reads on-device progress, runs post to /api/run, and a win
-// records level 10 passed in one storage write.
+// Arena (ADR-0014) inside the Mission control shell. Client-side:
+// the Account gate fetches /api/auth/me, ticks run in the language
+// workers, replay follows the cockpit model, and one finished battle
+// writes once to the v2 record. Abandoned battles write nothing.
 export default function ArenaPage() {
   return <Arena />;
 }

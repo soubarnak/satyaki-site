@@ -22,7 +22,8 @@ const WORKER_URL = "/workers/python-worker.js";
 let worker: Worker | null = null;
 let nextId = 1;
 let factoryOverride: WorkerFactory | null = null;
-const pending = new Map<number, { resolve: (result: PythonRunResult) => void; timer: ReturnType<typeof setTimeout> }>();
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const pending = new Map<number, { resolve: (result: any) => void; timer: ReturnType<typeof setTimeout> }>();
 
 /** Test seam: swap the Worker constructor without touching imports. */
 export function setPythonWorkerFactory(factory: WorkerFactory | null): void {
@@ -72,6 +73,49 @@ export function resetPythonWorker(): void {
 
 function timeoutResult(): PythonRunResult {
   return emptyPythonResult("time-cap", "TimeCap", "Run stopped: 3 s budget exceeded.");
+}
+
+export interface PythonTickRun {
+  code: string;
+  ship: { x: number; y: number; z: number; heading: string; energy: number; shield: boolean; crystals: number };
+  radar: { drone_distance: number; drone_direction: string; wave: number; drones_left: number };
+}
+
+export interface PythonTickResult {
+  action: string | null;
+  valid: boolean;
+  stdout: string;
+  error?: { kind: "error"; line: number; excType: string; message: string };
+}
+
+function emptyTickResult(excType: string, message: string): PythonTickResult {
+  return { action: null, valid: false, stdout: "", error: { kind: "error", line: 0, excType, message } };
+}
+
+/** Run one Arena tick in the Python worker (read-only ship/radar views). */
+export function runPythonTick(run: PythonTickRun): Promise<PythonTickResult> {
+  if (!isPythonWorkerSupported()) return Promise.reject(new Error("Python worker needs a browser Worker."));
+  const id = nextId;
+  nextId += 1;
+  return new Promise<PythonTickResult>((resolve) => {
+    const timer = setTimeout(() => {
+      if (!pending.has(id)) return;
+      pending.delete(id);
+      resetPythonWorker();
+      resolve(emptyTickResult("TimeCap", "Run stopped: 3 s budget exceeded."));
+    }, WORKER_TIMEOUT_MS);
+    pending.set(id, {
+      resolve: (result) => resolve(result as PythonTickResult),
+      timer,
+    });
+    try {
+      getWorker().postMessage({ id, kind: "tick", code: run.code, ship: run.ship, radar: run.radar });
+    } catch {
+      pending.delete(id);
+      clearTimeout(timer);
+      resolve(emptyTickResult("TimeCap", "Run stopped: 3 s budget exceeded."));
+    }
+  });
 }
 
 /**

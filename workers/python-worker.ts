@@ -12,8 +12,11 @@ import { shapeWorkerResult, type HarnessPayload } from "@/lib/python-worker-resu
 
 interface WorkerRequest {
   id: number;
+  kind?: "run" | "tick";
   code: string;
-  layout: unknown;
+  layout?: unknown;
+  ship?: { x: number; y: number; z: number; heading: string; energy: number; shield: boolean; crystals: number };
+  radar?: { drone_distance: number; drone_direction: string; wave: number; drones_left: number };
   indexURL?: string;
   interruptBuffer?: SharedArrayBuffer;
 }
@@ -69,7 +72,52 @@ async function ensureHarness(instance: Pyodide): Promise<void> {
   harnessLoaded = true;
 }
 
+async function handleTick(message: WorkerRequest): Promise<{ action: string | null; valid: boolean; stdout: string; error?: { kind: "error"; line: number; excType: string; message: string } }> {
+  if (!message.ship || !message.radar) {
+    return { action: null, valid: false, stdout: "", error: { kind: "error", line: 0, excType: "InvalidRequest", message: "Tick needs ship and radar." } };
+  }
+  const indexURL = message.indexURL ?? PYODIDE_BASE_PATH;
+  stdoutBuffer = "";
+  try {
+    const instance = await ensurePyodide(indexURL, message.interruptBuffer);
+    await ensureHarness(instance);
+    instance.globals.set("__tick_code__", message.code);
+    instance.globals.set("__tick_ship__", instance.toPy({ ...message.ship }));
+    instance.globals.set("__tick_radar__", instance.toPy({ ...message.radar }));
+    const payload = (await instance.runPythonAsync(
+      "run_arena_tick(__tick_code__, __tick_ship__, __tick_radar__)",
+    )) as {
+      toJs?(options?: Record<string, unknown>): unknown;
+      destroy?(): void;
+      [key: string]: unknown;
+    };
+    const raw =
+      payload !== null && typeof payload === "object" && typeof payload["toJs"] === "function"
+        ? (payload["toJs"]({ create_proxies: false, dict_converter: Object.fromEntries }) as Record<string, unknown>)
+        : ((payload ?? {}) as Record<string, unknown>);
+    try {
+      payload?.destroy?.();
+    } catch {
+      // Ignore teardown failures; the result stands.
+    }
+    return {
+      action: typeof raw["action"] === "string" ? (raw["action"] as string) : null,
+      valid: raw["valid"] === true,
+      stdout: typeof raw["stdout"] === "string" ? (raw["stdout"] as string) : stdoutBuffer,
+      error: (raw["error"] as { kind: "error"; line: number; excType: string; message: string } | null | undefined) ?? undefined,
+    };
+  } catch (error) {
+    const text = error instanceof Error ? error.message : String(error);
+    return { action: null, valid: false, stdout: stdoutBuffer, error: { kind: "error", line: 0, excType: "WorkerError", message: text.slice(0, 200) } };
+  }
+}
+
 async function handleRun(message: WorkerRequest): Promise<PythonRunResult> {
+  if (message.kind === "tick") {
+    const tick = await handleTick(message);
+    const fallback = emptyPythonResult(tick.error ? "error" : "none", "WorkerError", "");
+    return { ...fallback, stdout: tick.stdout, error: tick.error, status: tick.error ? "error" : "ok" };
+  }
   const validated = validateRunRequest({ code: message.code, layout: message.layout });
   if (!validated.ok) {
     return emptyPythonResult("error", "InvalidRequest", validated.message);
@@ -100,6 +148,18 @@ async function handleRun(message: WorkerRequest): Promise<PythonRunResult> {
 
 self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const message = event.data;
+  if (message.kind === "tick") {
+    void handleTick(message)
+      .then((result) => self.postMessage({ id: message.id, ...result }))
+      .catch((error: unknown) => self.postMessage({
+        id: message.id,
+        action: null,
+        valid: false,
+        stdout: "",
+        error: { kind: "error", line: 0, excType: "WorkerError", message: String(error).slice(0, 200) },
+      }));
+    return;
+  }
   void handleRun(message)
     .then((result) => self.postMessage({ id: message.id, ...result }))
     .catch((error: unknown) => self.postMessage({

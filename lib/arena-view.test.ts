@@ -1,87 +1,58 @@
+// Arena view suites (ADR-0014, spec §9).
+// Seam: the pure view helpers in lib/arena-view.ts. Expected lines come
+// from the glossary (Arena, Account, Cadet) and the ADR, never the code.
+
 import { describe, expect, test } from "vitest";
 import { runArenaBattle } from "./arena";
 import {
   ARENA_COMMANDS,
-  ARENA_GATE_IDS,
-  ARENA_LEVEL_ID,
-  ARENA_STARTER,
+  ARENA_JAVA_STARTER,
+  ARENA_PYTHON_STARTER,
+  ARENA_SIGN_IN_LINE,
+  arenaAccountOpen,
   arenaBattleLine,
-  arenaErrorFeedback,
-  arenaGate,
-  arenaLockLine,
+  arenaShouldRecord,
+  arenaTickErrorLine,
 } from "./arena-view";
-import { EMPTY_PROGRESS, type Progress } from "./progress";
-import type { RunOutcome } from "./lesson-player";
 
-// Arena view seams (WF-004): the FR-010 gate, the FR-007 error lines,
-// and the FR-011 verdict lines. Replay math is covered in arena.test.ts.
-
-function progressWith(passedLevelIds: number[]): Progress {
-  return { ...EMPTY_PROGRESS, passedLevelIds };
-}
-
-function outcome(partial: Partial<RunOutcome>): RunOutcome {
-  return { resultClass: "ok", stdout: "", stderr: "", durationMs: 12, ...partial };
-}
-
-describe("arenaGate (FR-010)", () => {
-  test("empty progress stays locked with 9 remaining", () => {
-    const gate = arenaGate(EMPTY_PROGRESS);
-    expect(gate.open).toBe(false);
-    expect(gate.remaining).toBe(9);
-    expect(gate.nextLevelId).toBe(1);
+describe("arena account gate (ADR-0014)", () => {
+  test("logged-out Cadets never open a guest battle", () => {
+    expect(arenaAccountOpen({ loggedIn: false })).toBe(false);
+    expect(arenaAccountOpen({ loggedIn: true })).toBe(true);
   });
 
-  test("levels 1 to 8 passed stays locked with 1 remaining", () => {
-    const gate = arenaGate(progressWith([1, 2, 3, 4, 5, 6, 7, 8]));
-    expect(gate.open).toBe(false);
-    expect(gate.remaining).toBe(1);
-    expect(gate.nextLevelId).toBe(9);
-  });
-
-  test("levels 1 to 9 passed opens the arena", () => {
-    const gate = arenaGate(progressWith([1, 2, 3, 4, 5, 6, 7, 8, 9]));
-    expect(gate.open).toBe(true);
-    expect(gate.remaining).toBe(0);
-    expect(gate.nextLevelId).toBeNull();
-  });
-
-  test("gate covers exactly levels 1 to 9", () => {
-    expect([...ARENA_GATE_IDS]).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(ARENA_LEVEL_ID).toBe(10);
+  test("sign-in prompt names the Account, never a guest battle", () => {
+    expect(ARENA_SIGN_IN_LINE).toMatch(/Account/);
+    expect(ARENA_SIGN_IN_LINE).toMatch(/sign in/i);
   });
 });
 
-describe("arenaLockLine (FR-010 AC-2)", () => {
-  test("8 passed names the 1 level that remains", () => {
-    const line = arenaLockLine(arenaGate(progressWith([1, 2, 3, 4, 5, 6, 7, 8])));
-    expect(line).toContain("1 level remains");
-    expect(line).toContain("Level 9");
+describe("arena starters (ADR-0014)", () => {
+  test("Python starter defines on_tick with read-only comments", () => {
+    expect(ARENA_PYTHON_STARTER).toContain("def on_tick(ship, radar):");
+    expect(ARENA_PYTHON_STARTER).toContain("drone_distance");
+    expect(ARENA_PYTHON_STARTER).toContain("read-only");
+    expect(ARENA_PYTHON_STARTER).toContain('return "wait"');
   });
 
-  test("empty progress names the 9 levels that remain", () => {
-    const line = arenaLockLine(arenaGate(EMPTY_PROGRESS));
-    expect(line).toContain("9 levels remain");
+  test("Java starter is always full-scaffold with onTick", () => {
+    expect(ARENA_JAVA_STARTER).toContain("public class Main");
+    expect(ARENA_JAVA_STARTER).toContain("onTick(Ship ship, Radar radar)");
+    expect(ARENA_JAVA_STARTER).toContain("droneDistance");
+    expect(ARENA_JAVA_STARTER).toContain("read-only");
   });
 
-  test("open gate needs no lock line", () => {
-    const line = arenaLockLine(arenaGate(progressWith([1, 2, 3, 4, 5, 6, 7, 8, 9])));
-    expect(line).toBe("");
-  });
-});
-
-describe("arena starter and command help (WF-004 step 1)", () => {
-  test("starter is a runnable Main printing one command", () => {
-    expect(ARENA_STARTER).toContain("class Main");
-    expect(ARENA_STARTER).toContain("System.out.println(");
-    expect(ARENA_STARTER).toContain("MOVE");
-  });
-
-  test("command help lists exactly MOVE, TURN, and ATTACK", () => {
+  test("command help lists all 9 tick actions", () => {
     expect(ARENA_COMMANDS.map((entry) => entry.command)).toEqual([
-      "MOVE",
-      "TURN",
-      "ATTACK",
+      "move",
+      "turn_left",
+      "turn_right",
+      "ascend",
+      "descend",
+      "laser",
+      "harvest",
+      "shield",
+      "wait",
     ]);
     for (const entry of ARENA_COMMANDS) {
       expect(entry.meaning.length).toBeGreaterThan(0);
@@ -89,54 +60,51 @@ describe("arena starter and command help (WF-004 step 1)", () => {
   });
 });
 
-describe("arenaErrorFeedback (FR-007 alternate path)", () => {
-  for (const resultClass of ["compile", "runtime", "memory-cap", "time-cap"]) {
-    test(`${resultClass} is a code error that keeps the raw text`, () => {
-      const run = outcome({ resultClass, stderr: "Main.java:3: error" });
-      const feedback = arenaErrorFeedback(run, run.stderr);
-      expect(feedback.kind).toBe("code-error");
-      expect(feedback.boltLine.length).toBeGreaterThan(0);
-      expect(feedback.rawError).toBe("Main.java:3: error");
-    });
-  }
-
-  test("runner down or busy reads distinct from a code mistake", () => {
-    for (const resultClass of ["runner-unavailable", "busy"]) {
-      const feedback = arenaErrorFeedback(outcome({ resultClass }));
-      expect(feedback.kind).toBe("runner-problem");
-      expect(feedback.boltLine).toMatch(/[Tt]ry Run again/);
-    }
-    const compile = arenaErrorFeedback(outcome({ resultClass: "compile" }));
-    const down = arenaErrorFeedback(outcome({ resultClass: "runner-unavailable" }));
-    expect(down.boltLine).not.toBe(compile.boltLine);
+describe("arenaBattleLine (spec §9 verdicts)", () => {
+  test("win names wave 5 and the tick count", () => {
+    const battle = runArenaBattle(() => "wait");
+    const line = arenaBattleLine({ ...battle, won: true, reason: "win", wave: 5, ticks: 156 });
+    expect(line).toMatch(/Victory/);
+    expect(line).toContain("wave 5");
+    expect(line).toContain("156");
   });
 
-  test("unknown class fails closed with the generic try-again line", () => {
-    const run = outcome({ resultClass: "mystery", stderr: "raw" });
-    const feedback = arenaErrorFeedback(run, run.stderr);
-    expect(feedback.kind).toBe("code-error");
-    expect(feedback.rawError).toBe("raw");
+  test("loss names the wave and tick", () => {
+    const battle = runArenaBattle(() => "wait");
+    const line = arenaBattleLine({ ...battle, won: false, reason: "loss", wave: 2, ticks: 40 });
+    expect(line).toContain("wave 2");
+    expect(line).toContain("tick 40");
+  });
+
+  test("cap names the 200-tick limit", () => {
+    const battle = runArenaBattle(() => "wait");
+    expect(arenaBattleLine(battle)).toContain("200");
+  });
+
+  test("error points at the tick program", () => {
+    const battle = runArenaBattle(() => {
+      throw { line: 3, excType: "NameError", message: "nope" };
+    });
+    expect(arenaBattleLine(battle)).toMatch(/tick program|stopped/);
   });
 });
 
-describe("arenaBattleLine (FR-011)", () => {
-  const reference = [...Array<string>(4).fill("MOVE"), ...Array<string>(20).fill("ATTACK")].join(
-    "\n",
-  );
-
-  test("reference win names victory and the level 10 award", () => {
-    const line = arenaBattleLine(runArenaBattle(reference));
-    expect(line).toMatch(/Victory/);
-    expect(line).toContain("200 points");
+describe("arena tick errors (kid sentences)", () => {
+  test("read-only writes stay kid-readable in both languages", () => {
+    const frame = { line: 4, excType: "ReadOnly", message: "ship.x is read-only" };
+    expect(arenaTickErrorLine(frame, "python")).toMatch(/read-only/);
+    expect(arenaTickErrorLine(frame, "java")).toMatch(/read-only/);
   });
 
-  test("empty stdout asks for commands", () => {
-    const line = arenaBattleLine(runArenaBattle("Bolt is awake!"));
-    expect(line).toMatch(/no commands/);
+  test("missing on_tick names the starter frame", () => {
+    const line = arenaTickErrorLine({ line: 0, excType: "NoOnTick", message: "missing" }, "python");
+    expect(line.length).toBeGreaterThan(0);
   });
+});
 
-  test("short attack run stays open for retry", () => {
-    const line = arenaBattleLine(runArenaBattle("ATTACK"));
-    expect(line).toMatch(/Not yet/);
+describe("arena record rule (ADR-0014)", () => {
+  test("finished battles record; abandoned battles write nothing", () => {
+    expect(arenaShouldRecord(true)).toBe(true);
+    expect(arenaShouldRecord(false)).toBe(false);
   });
 });

@@ -1,46 +1,42 @@
 "use client";
 
-// Robot arena at `/arena` (WF-004): gate on levels 1 to 9 passed
-// (FR-010), robot commands plus starter code plus battle board on one
-// screen (WF-004 step 1), engine replay animated step by step with a
-// win recording level 10 passed in one storage write (FR-011).
+// Arena battles (ADR-0014, spec §9): Account-only on_tick battles over
+// five drone waves, replayed through the cockpit playback model.
+// Glossary: Arena, Account, Cadet, Ship, World State.
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  ARENA_ATTACK_DAMAGE,
-  ARENA_MAX_COMMANDS,
-  ARENA_OPPONENT_HEALTH,
-  ARENA_START_DISTANCE,
-  runArenaBattle,
-  type ArenaResult,
+  ARENA_TICK_CAP,
+  ARENA_WAVES,
+  arenaHudLabel,
+  arenaStepTicks,
+  arenaWorldAt,
+  runArenaBattleAsync,
+  type ArenaBattleResult,
+  type ArenaFrame,
 } from "@/lib/arena";
 import {
   ARENA_COMMANDS,
-  ARENA_LEVEL_ID,
-  ARENA_STARTER,
+  ARENA_JAVA_STARTER,
+  ARENA_PYTHON_STARTER,
+  ARENA_SIGN_IN_LINE,
+  arenaAccountOpen,
   arenaBattleLine,
-  arenaErrorFeedback,
-  arenaGate,
-  arenaLockLine,
+  arenaShouldRecord,
+  arenaTickErrorLine,
 } from "@/lib/arena-view";
-import { parseRunOutcome, type RunOutcome } from "@/lib/lesson-player";
-import { localDateString, recordPass, recordRunDay } from "@/lib/progress";
-import { browserProgressStorage } from "@/lib/progress-storage";
+import { runJavaTick } from "@/lib/java-interpreter";
+import { normalizeArenaAction } from "@/lib/arena";
+import { runPythonTick } from "@/lib/python-worker-client";
+import { browserProgressV2Storage } from "@/lib/progress-v2-storage";
+import { recordArenaBattleV2, type CadetLanguage } from "@/lib/progress";
 import { Bolt } from "./bolt";
-import { useProgress } from "./use-progress";
 
-/** Milliseconds between replay steps while the battle animates. */
-const STEP_MS = 600;
+/** Milliseconds per tick at 1x; cockpit model is 650 ms per frame. */
+const TICK_MS = 650;
 
-function submitOutcome(outcome: RunOutcome, status: number): RunOutcome {
-  // A refused run (rate limit) still arrives classed per ADR-0005; only
-  // fall back to busy when the route gave no class to render.
-  if (outcome.resultClass === "unknown" && (status === 429 || status === 503)) {
-    return { ...outcome, resultClass: "busy" };
-  }
-  return outcome;
-}
+type SessionState = "checking" | "in" | "out";
 
 function prefersReducedMotion(): boolean {
   return (
@@ -50,145 +46,160 @@ function prefersReducedMotion(): boolean {
   );
 }
 
-interface BoardState {
-  boltPos: number;
-  boltDir: 1 | -1;
-  opponentHealth: number;
-}
-
-function boardAt(battle: ArenaResult | null, stepIndex: number): BoardState {
-  if (battle === null || stepIndex <= 0) {
-    return { boltPos: 0, boltDir: 1, opponentHealth: ARENA_OPPONENT_HEALTH };
-  }
-  const step = battle.steps[Math.min(stepIndex, battle.steps.length) - 1];
-  return { boltPos: step.boltPos, boltDir: step.boltDir, opponentHealth: step.opponentHealth };
-}
-
 export function Arena() {
-  const { progress, loaded } = useProgress();
-  const [code, setCode] = useState(ARENA_STARTER);
+  const [session, setSession] = useState<SessionState>("checking");
+  const [language, setLanguage] = useState<CadetLanguage>("python");
+  const [code, setCode] = useState(ARENA_PYTHON_STARTER);
   const [running, setRunning] = useState(false);
-  const [boltLine, setBoltLine] = useState(
-    "Final mission, Cadet. Print MOVE, TURN, and ATTACK to wake the station.",
-  );
-  const [stdout, setStdout] = useState("");
-  const [rawError, setRawError] = useState("");
-  const [durationMs, setDurationMs] = useState<number | null>(null);
-  const [battle, setBattle] = useState<ArenaResult | null>(null);
-  const [stepIndex, setStepIndex] = useState(0);
+  const [boltLine, setBoltLine] = useState("Fly five drone waves, Cadet.");
+  const [battle, setBattle] = useState<ArenaBattleResult | null>(null);
+  const [cursor, setCursor] = useState(-1);
   const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState<1 | 2 | 4>(1);
+  const [record, setRecord] = useState<{ played: number; won: number; bestWave: number } | null>(() => {
+    try {
+      if (typeof window === "undefined") return null;
+      const arena = browserProgressV2Storage().load().arena;
+      return { played: arena.played, won: arena.won, bestWave: arena.bestWave };
+    } catch {
+      return null;
+    }
+  });
+  const cancelRef = useRef({ cancelled: false });
 
-  const gate = arenaGate(progress);
-
-  // Step the replay forward while it plays; the final tick lands on
-  // the verdict and stops. Manual stepping pauses the replay.
   useEffect(() => {
-    if (!playing || battle === null || stepIndex >= battle.steps.length) return;
-    const timer = window.setTimeout(() => {
-      const next = stepIndex + 1;
-      setStepIndex(next);
-      if (next >= battle.steps.length) setPlaying(false);
-    }, STEP_MS);
-    return () => window.clearTimeout(timer);
-  }, [playing, battle, stepIndex]);
+    let live = true;
+    fetch("/api/auth/me")
+      .then((res) => {
+        if (live) setSession(res.ok ? "in" : "out");
+      })
+      .catch(() => {
+        if (live) setSession("out");
+      });
+    cancelRef.current = { cancelled: false };
+    return () => {
+      live = false;
+      cancelRef.current.cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!playing || battle === null) return;
+    const timer = window.setInterval(() => {
+      setCursor((current) => {
+        const next = Math.min(battle.frames.length - 1, current + 1);
+        if (next >= battle.frames.length - 1) setPlaying(false);
+        return next;
+      });
+    }, TICK_MS / speed);
+    return () => window.clearInterval(timer);
+  }, [playing, battle, speed]);
+
+  function switchLanguage(next: CadetLanguage): void {
+    setLanguage(next);
+    setCode(next === "python" ? ARENA_PYTHON_STARTER : ARENA_JAVA_STARTER);
+    setBattle(null);
+    setCursor(-1);
+    setPlaying(false);
+    setBoltLine("Fly five drone waves, Cadet.");
+  }
 
   async function handleRun(): Promise<void> {
-    if (running) return;
+    if (running || session !== "in") return;
+    const snapshot = code;
+    const lang = language;
+    const cancel = { cancelled: false };
+    cancelRef.current = cancel;
     setRunning(true);
+    setPlaying(false);
+    setBattle(null);
+    setCursor(-1);
+    setBoltLine("Battle flying, Cadet.");
     try {
-      let outcome: RunOutcome;
-      let status = 200;
-      try {
-        const response = await fetch("/api/run", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ program: code }),
-        });
-        status = response.status;
-        let body: unknown = null;
-        try {
-          body = await response.json();
-        } catch {
-          body = null;
+      const started = Date.now();
+      const result = await runArenaBattleAsync(async (ship, radar) => {
+        if (cancel.cancelled) throw { line: 0, excType: "Abandoned", message: "abandoned" };
+        if (lang === "java") {
+          const tick = runJavaTick({
+            code: snapshot,
+            ship: { ...ship },
+            radar: {
+              droneDistance: radar.drone_distance,
+              droneDirection: radar.drone_direction,
+              wave: radar.wave,
+              dronesLeft: radar.drones_left,
+            },
+          });
+          if (tick.error) throw tick.error;
+          if (!tick.valid || tick.normalized === null) return tick.action ?? "wait";
+          return tick.normalized;
         }
-        outcome = submitOutcome(parseRunOutcome(body), status);
-      } catch {
-        // The fetch itself failed: the runner is unreachable from here.
-        outcome = { resultClass: "runner-unavailable", stdout: "", stderr: "", durationMs: 0 };
-      }
-      // One storage write per completed run (ADR-0006): a win records
-      // level 10 passed plus its streak day together (FR-011, FR-008
-      // once-semantics by set); any other run only marks the run day
-      // (FR-015) with no points change.
-      const storage = browserProgressStorage();
-      const today = localDateString(new Date());
-      const current = storage.load();
-      if (outcome.resultClass !== "ok") {
-        const feedback = arenaErrorFeedback(outcome, outcome.stderr);
-        setBattle(null);
-        setStepIndex(0);
-        setPlaying(false);
-        setBoltLine(feedback.boltLine);
-        setStdout(outcome.stdout);
-        setRawError(feedback.rawError);
-        setDurationMs(outcome.durationMs);
-        storage.save(recordRunDay(current, today));
-        return;
-      }
-      const result = runArenaBattle(outcome.stdout);
+        const tick = await runPythonTick({
+          code: snapshot,
+          ship: { ...ship },
+          radar: { ...radar },
+        });
+        if (tick.error) throw tick.error;
+        if (!tick.valid || typeof tick.action !== "string") return tick.action ?? "wait";
+        return normalizeArenaAction(tick.action).normalized ?? tick.action;
+      }, cancel);
+      if (result === null || cancel.cancelled) return;
       setBattle(result);
-      setStdout(outcome.stdout);
-      setRawError("");
-      setDurationMs(outcome.durationMs);
-      setBoltLine(arenaBattleLine(result));
-      // Jump straight to the verdict when the learner prefers no
-      // motion; otherwise replay from the first command.
       const reduced = prefersReducedMotion();
-      setStepIndex(reduced || result.steps.length === 0 ? result.steps.length : 0);
-      setPlaying(!reduced && result.steps.length > 0);
-      storage.save(
-        result.won ? recordPass(current, ARENA_LEVEL_ID, today) : recordRunDay(current, today),
-      );
+      setCursor(reduced ? result.frames.length - 1 : -1);
+      setPlaying(!reduced && result.frames.length > 0);
+      if (result.reason === "error" && result.error) {
+        setBoltLine(arenaTickErrorLine(result.error, lang));
+      } else {
+        setBoltLine(arenaBattleLine(result));
+      }
+      void started;
+      if (arenaShouldRecord(true)) {
+        const storage = browserProgressV2Storage();
+        const current = storage.load();
+        const next = recordArenaBattleV2(current, { won: result.won, wave: result.wave, language: lang });
+        storage.save(next);
+        setRecord({ played: next.arena.played, won: next.arena.won, bestWave: next.arena.bestWave });
+      }
     } finally {
-      setRunning(false);
+      if (!cancel.cancelled) setRunning(false);
     }
   }
 
-  const board = boardAt(battle, stepIndex);
-  const currentStep = stepIndex > 0 ? battle?.steps[stepIndex - 1] ?? null : null;
+  const open = arenaAccountOpen({ loggedIn: session === "in" });
+  const world = battle === null ? arenaWorldAt([], -1) : arenaWorldAt(battle.frames, cursor);
+  const steps = battle === null ? [] : arenaStepTicks(battle.frames);
+  const frame: ArenaFrame | null =
+    battle !== null && cursor >= 0 ? battle.frames[Math.min(cursor, battle.frames.length - 1)] ?? null : null;
 
   return (
     <>
-      <h1>Robot arena</h1>
-      <p className="map-intro">
-        Final mission, Cadet. Walk Bolt to the station and wake it before the rescue window closes.
-      </p>
+      <h1>Arena</h1>
+      <p className="map-intro">Five drone waves, one tick function, Cadet.</p>
 
       <div className="bolt-row">
         <Bolt size={72} />
         <p className="bolt-bubble" role="status">
-          {!loaded ? "Loading your quest, Cadet." : gate.open ? boltLine : arenaLockLine(gate)}
+          {session === "checking" ? "Checking your Account, Cadet." : open ? boltLine : ARENA_SIGN_IN_LINE}
         </p>
       </div>
 
-      {!loaded ? (
+      {session === "checking" ? (
         <p>Loading the arena, Cadet.</p>
-      ) : !gate.open ? (
-        <>
-          <p>
-            The battle board stays dark until the earlier planets are passed, Cadet.{" "}
-            <Link href="/">Back to the level map</Link>
-          </p>
-        </>
+      ) : !open ? (
+        <p>
+          The Arena needs an Account, Cadet. <Link href="/login">Sign in</Link> to fly. No guest battles.
+        </p>
       ) : (
         <div className="lesson-grid">
           <section aria-label="Mission">
             <h2>Mission</h2>
             <p>
-              Print one command per line. Bolt walks the lane in your print order, and the station
-              wakes only when its health reaches 0 within {ARENA_MAX_COMMANDS} commands.
+              Write <code>on_tick</code> ({language === "python" ? "Python" : "Java"}). It runs once per tick for up
+              to {ARENA_TICK_CAP} ticks across {ARENA_WAVES} waves and returns exactly one action string. Invalid
+              returns waste the tick.
             </p>
-            <h3>Robot commands</h3>
+            <h3>Tick actions</h3>
             <ul className="arena-commands">
               {ARENA_COMMANDS.map((entry) => (
                 <li key={entry.command}>
@@ -197,21 +208,34 @@ export function Arena() {
               ))}
             </ul>
             <p className="lesson-goal-output">
-              Station health {ARENA_OPPONENT_HEALTH} · {ARENA_ATTACK_DAMAGE} damage per facing hit ·{" "}
-              {ARENA_START_DISTANCE} cells apart
+              5 waves · wave n fields n+1 drones · shield stops one drone then drops · laser breaks the drone ahead ·
+              energy refills to 50 per wave · win clears wave 5.
             </p>
+            {record !== null && (
+              <p className="lesson-goal-output" aria-label="Arena record">
+                Battles {record.played} · won {record.won} · best wave {record.bestWave}
+              </p>
+            )}
           </section>
 
           <section aria-label="Code and result">
+            <div className="lesson-controls" role="group" aria-label="Language">
+              <button type="button" onClick={() => switchLanguage("python")} disabled={language === "python"}>
+                Python
+              </button>
+              <button type="button" onClick={() => switchLanguage("java")} disabled={language === "java"}>
+                Java
+              </button>
+            </div>
             <label className="editor-label" htmlFor="arena-editor">
-              Your Java program
+              {language === "python" ? "Your Python program" : "Your Java program"}
             </label>
             <textarea
               id="arena-editor"
               className="lesson-editor"
               value={code}
               onChange={(event) => setCode(event.target.value)}
-              rows={10}
+              rows={14}
               spellCheck={false}
               autoComplete="off"
               autoCorrect="off"
@@ -219,53 +243,34 @@ export function Arena() {
             />
             <div className="lesson-controls">
               <button type="button" onClick={() => void handleRun()} disabled={running}>
-                {running ? "Running…" : "Run"}
+                {running ? "Flying…" : "Fly"}
               </button>
             </div>
 
-            <h3>Battle board</h3>
-            <div className="arena-board" aria-label="Battle board">
-              {Array.from({ length: ARENA_START_DISTANCE + 1 }, (_, cell) => (
-                <div
-                  key={cell}
-                  className={
-                    cell === board.boltPos
-                      ? "arena-cell arena-cell-bolt"
-                      : cell === ARENA_START_DISTANCE
-                        ? "arena-cell arena-cell-station"
-                        : "arena-cell"
-                  }
-                >
-                  {cell === board.boltPos ? (
-                    <span>
-                      Bolt {board.boltDir === 1 ? "→" : "←"}
-                    </span>
-                  ) : cell === ARENA_START_DISTANCE ? (
-                    <span>Station ♥{board.opponentHealth}</span>
-                  ) : (
-                    <span aria-hidden="true">·</span>
-                  )}
-                </div>
-              ))}
-            </div>
+            <h3>Battle replay</h3>
             <p className="lesson-goal-output" aria-label="Battle state">
               {battle === null
-                ? "Run your program to light up the battle board."
-                : currentStep === null
-                  ? `Bolt at cell ${board.boltPos}, facing ${board.boltDir === 1 ? "east" : "west"}. Station health ${board.opponentHealth}.`
-                  : `Command ${currentStep.index} of ${battle.steps.length}: ${currentStep.command} — Bolt at cell ${currentStep.boltPos}, station health ${currentStep.opponentHealth}.`}
+                ? "Press Fly to start wave 1."
+                : arenaHudLabel(world, cursor, battle.frames.length)}
+            </p>
+            <p className="lesson-goal-output" aria-label="Battle detail">
+              {battle === null
+                ? "Ship holds west while drones cross from the east edge."
+                : frame === null
+                  ? `Wave ${world.wave}: ${world.drones.length} drones left.`
+                  : `Tick ${frame.tick} wave ${frame.wave}: ${frame.valid ? frame.normalized : "wasted tick"} — ${frame.dronesLeft} drones left.`}
             </p>
 
-            {battle !== null && battle.steps.length > 0 && (
+            {battle !== null && battle.frames.length > 0 && (
               <>
                 <div className="lesson-controls arena-replay-controls">
                   <button
                     type="button"
                     onClick={() => {
                       setPlaying(false);
-                      setStepIndex((index) => Math.max(0, index - 1));
+                      setCursor((index) => Math.max(-1, index - 1));
                     }}
-                    disabled={stepIndex <= 0}
+                    disabled={cursor <= -1}
                   >
                     Step back
                   </button>
@@ -274,63 +279,55 @@ export function Arena() {
                     onClick={() => {
                       if (playing) {
                         setPlaying(false);
-                      } else if (stepIndex >= battle.steps.length) {
-                        setStepIndex(0);
+                      } else if (cursor >= battle.frames.length - 1) {
+                        setCursor(-1);
                         setPlaying(true);
                       } else {
                         setPlaying(true);
                       }
                     }}
                   >
-                    {playing ? "Pause replay" : stepIndex >= battle.steps.length ? "Replay again" : "Watch replay"}
+                    {playing ? "Pause replay" : cursor >= battle.frames.length - 1 ? "Replay again" : "Watch replay"}
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       setPlaying(false);
-                      setStepIndex((index) => Math.min(battle.steps.length, index + 1));
+                      setCursor((index) => Math.min(battle.frames.length - 1, index + 1));
                     }}
-                    disabled={stepIndex >= battle.steps.length}
+                    disabled={cursor >= battle.frames.length - 1}
                   >
                     Step forward
                   </button>
+                  <button type="button" onClick={() => setSpeed(1)} disabled={speed === 1}>
+                    1x
+                  </button>
+                  <button type="button" onClick={() => setSpeed(2)} disabled={speed === 2}>
+                    2x
+                  </button>
+                  <button type="button" onClick={() => setSpeed(4)} disabled={speed === 4}>
+                    4x
+                  </button>
                 </div>
-                <ol className="arena-steps" aria-label="Replayed commands">
-                  {battle.steps.map((step) => (
-                    <li
-                      key={step.index}
-                      aria-current={step.index === stepIndex ? "step" : undefined}
-                      className={step.index === stepIndex ? "arena-step-current" : undefined}
-                    >
-                      <code>{step.command}</code>
-                      {step.damageDealt > 0 ? ` hits for ${step.damageDealt}` : ""}
-                    </li>
-                  ))}
-                </ol>
+                <label className="editor-label" htmlFor="arena-scrubber">
+                  Tick scrubber{steps.length > 0 ? ` · ${steps.length} Ship ticks` : ""}
+                </label>
+                <input
+                  id="arena-scrubber"
+                  type="range"
+                  min={-1}
+                  max={battle.frames.length - 1}
+                  value={cursor}
+                  onChange={(event) => {
+                    setPlaying(false);
+                    setCursor(Number(event.target.value));
+                  }}
+                />
               </>
             )}
-
-            <h3>What happened</h3>
-            {battle?.won === true && (
-              <p className="lesson-pass">
-                Station awake, Cadet. The quest is complete.{" "}
-                <Link href="/progress">See your progress</Link> · <Link href="/">Level map</Link>
-              </p>
-            )}
-            <pre className="lesson-output" aria-label="Program output">
-              {stdout}
-              {rawError !== "" ? `\n${rawError}` : ""}
-              {stdout === "" && rawError === "" ? "Press Run to see your output here." : ""}
-            </pre>
-            {durationMs !== null && <p className="lesson-duration">Run time: {formatDuration(durationMs)}</p>}
           </section>
         </div>
       )}
     </>
   );
-}
-
-function formatDuration(durationMs: number): string {
-  if (durationMs < 1000) return `${durationMs} ms`;
-  return `${(durationMs / 1000).toFixed(1)} s`;
 }
