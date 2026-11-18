@@ -27,9 +27,14 @@ export function javaParses(code: string): boolean {
   }
 }
 
-/** Java snippets are bare statements; wrap them so the parser accepts them. */
+/**
+ * Java snippets are bare statements, or class members (methods) in the
+ * function Planets; accept either wrapping.
+ */
 export function javaSnippetParses(snippet: string): boolean {
-  return javaParses(
-    `public class Main {\n    public static void main(String[] args) {\n${snippet}\n    }\n}\n`,
+  return (
+    javaParses(
+      `public class Main {\n    public static void main(String[] args) {\n${snippet}\n    }\n}\n`,
+    ) || javaParses(`public class Main {\n${snippet}\n}\n`)
   );
 }
