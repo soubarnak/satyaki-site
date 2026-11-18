@@ -15,6 +15,7 @@ import {
   checkPack,
   checkJavaStage,
   JAVA_MARKERS,
+  parFormula,
   PYTHON_MARKERS,
   type PackOracle,
 } from "./pack-oracle";
@@ -74,8 +75,8 @@ export function describePack(pack: PlanetPack, oracle: PackOracle): void {
       for (const [i, row] of oracle.missions.entries()) {
         const mission = pack.missions[i];
         expect(mission.par).toEqual({
-          maxSteps: Math.ceil(1.5 * row.refSteps) + 2,
-          maxEnergy: Math.ceil(1.5 * row.refEnergy) + 2,
+          maxSteps: parFormula(row.refSteps),
+          maxEnergy: parFormula(row.refEnergy),
         });
         expect(mission.seedPool).toEqual(row.seedPool);
       }
