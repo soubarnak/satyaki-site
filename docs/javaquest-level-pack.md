@@ -49,7 +49,7 @@ Bolt is awake!
 
 - **Concept:** variables
 - **Story:** Planet Zorba waits beyond the dust belt with two bright moons. Store Zorba in planet and two in moons, Cadet.
-- **Objective:** Use variables to remember each Zorba fact.
+- **Objective:** Use variables to remember each Zorba fact, then print both values.
 
 #### Starter code
 
@@ -59,7 +59,6 @@ public class Main {
         // YOUR CODE BELOW
 
         // YOUR CODE ABOVE
-        System.out.println(moons);
     }
 }
 ```

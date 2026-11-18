@@ -71,13 +71,12 @@ export const LEVELS: readonly Level[] = [
     concept: "variables",
     story:
       "Planet Zorba waits beyond the dust belt with two bright moons. Store Zorba in planet and two in moons, Cadet.",
-    objective: "Use variables to remember each Zorba fact.",
+    objective: "Use variables to remember each Zorba fact, then print both values.",
     starterCode: `public class Main {
     public static void main(String[] args) {
         // YOUR CODE BELOW
 
         // YOUR CODE ABOVE
-        System.out.println(moons);
     }
 }`,
     expectedOutput: "Zorba\n2",

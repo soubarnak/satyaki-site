@@ -147,3 +147,20 @@ describe("judgeRun (NFR-014: no pass under faults)", () => {
     ).toBe(false);
   });
 });
+
+describe("level 2 natural completion (#58: no duplicate print)", () => {
+  it("passes judgeRun when reference lines fill the starter once", () => {
+    const starter = level(2).starterCode;
+    expect(starter).not.toContain("System.out.println(moons);");
+    const program = starter.replace(
+      "        // YOUR CODE BELOW\n\n        // YOUR CODE ABOVE",
+      `        String planet = "Zorba";\n        int moons = 2;\n        System.out.println(planet);\n        System.out.println(moons);`,
+    );
+    expect(program).not.toEqual(starter);
+    const verdict = judgeRun(level(2), program, {
+      resultClass: "ok",
+      stdout: "Zorba\n2\n",
+    });
+    expect(verdict.passed).toBe(true);
+  });
+});

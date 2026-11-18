@@ -115,3 +115,13 @@ describe("validateLevels (FR-004 concept order)", () => {
     expect(validateLevels(tokenless).join(" ")).toMatch(/concept token/);
   });
 });
+
+describe("level 2 starter (#58: no duplicate print)", () => {
+  it("has no pre-printed moons line", () => {
+    expect(getLevel(2)?.starterCode).not.toContain("System.out.println(moons);");
+  });
+
+  it("objective tells the cadet to print", () => {
+    expect(getLevel(2)?.objective).toMatch(/print/);
+  });
+});
