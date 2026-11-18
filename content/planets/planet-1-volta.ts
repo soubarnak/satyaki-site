@@ -112,6 +112,18 @@ const launchLane: AuthoredLayout = {
   ],
 };
 
+/** Boss Gate Part B lane: same bounds and route, decorative crystal at x 2. */
+const partBLane: AuthoredLayout = {
+  shipStart: { x: 0, y: 0, z: 0, heading: "east", energy: 30 },
+  bounds: bounds(8, 0, 2),
+  entities: [
+    { id: "switch-1", type: "switch", x: 5, y: 0, z: 0, linkId: "gate-1" },
+    { id: "gate-1", type: "gate", x: 6, y: 0, z: 0, linkId: "gate-1" },
+    { id: "asteroid-1", type: "asteroid_titanium", x: 7, y: 0, z: 0 },
+    { id: "crystal-1", type: "crystal", x: 2, y: 0, z: 2 },
+  ],
+};
+
 const m1Comments = ["Wake the Ship. move() flies one cell the way the Ship faces."];
 const m2Comments = [
   "Two stacks wait: 2 cells, then 3 cells. Add them with + and log the total.",
@@ -383,7 +395,7 @@ export const voltaBossGate: BossGate = {
     ],
     pythonStarter: pythonStarter(partBComments),
     javaStarter: javaFullScaffold(partBComments),
-    layout: launchLane,
+    layout: partBLane,
     seedPool: [601, 602, 603],
     checks: [
       check("gate-open", "Open the launch gate", "entities.gate-1.open", true),

@@ -27,6 +27,12 @@ const launchLayout = lane(8, 2, 30, [
   ["asteroid-1", "asteroid_titanium", 7, 0, 0],
   crystal("crystal-1", 3, 2),
 ]);
+// Part B uses the same lane and route; the spec places its crystal at x 2.
+const partBLayout = lane(8, 2, 30, [
+  ...switchGate(5, 0, 6, 0),
+  ["asteroid-1", "asteroid_titanium", 7, 0, 0],
+  crystal("crystal-1", 2, 2),
+]);
 
 export const voltaOracle: PackOracle = {
   planet: {
@@ -132,7 +138,7 @@ export const voltaOracle: PackOracle = {
       refSteps: 7,
       refEnergy: 7,
       checks: [...gateChecks, ["shield-up", "ship.shield", "eq", true, "final"]],
-      layout: launchLayout,
+      layout: partBLayout,
     },
   },
   referenceDir: "content/references/planet-1",
