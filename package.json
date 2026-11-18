@@ -17,15 +17,18 @@
     "vendor:pyodide:check": "node scripts/vendor-pyodide.mjs --check"
   },
   "dependencies": {
+    "drizzle-orm": "^0.45.4",
     "fflate": "^0.8.3",
     "java-parser": "^3.0.1",
     "next": "16.4.3",
+    "pg": "^8.23.1",
     "react": "19.3.0",
     "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@playwright/test": "^1",
     "@types/node": "^20",
+    "@types/pg": "^8.11.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
